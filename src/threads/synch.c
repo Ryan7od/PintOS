@@ -57,6 +57,19 @@ sema_init (struct semaphore *sema, unsigned value)
    interrupt handler.  This function may be called with
    interrupts disabled, but if it sleeps then the next scheduled
    thread will probably turn interrupts back on. */
+
+bool
+sema_priority_compare (const struct list_elem *sema_a, const struct list_elem *sema_b, void *aux UNUSED)
+{
+  struct semaphore_elem *sema_elem_a = list_entry(sema_a, struct semaphore_elem, elem);
+  struct semaphore_elem *sema_elem_b = list_entry(sema_b, struct semaphore_elem, elem);
+
+  struct thread *thread_a = list_entry(list_front(&sema_elem_a->semaphore.waiters), struct thread, elem);
+  struct thread *thread_b = list_entry(list_front(&sema_elem_b->semaphore.waiters), struct thread, elem);
+
+  return thread_a->priority > thread_b->priority;
+}
+   
 void
 sema_down (struct semaphore *sema) 
 {
@@ -295,7 +308,7 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  list_push_back (&cond->waiters, &waiter.elem);
+  list_insert_ordered(&cond->waiters, &waiter.elem, sema_priority_compare, NULL);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
