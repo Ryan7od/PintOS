@@ -100,6 +100,16 @@ thread_init (void)
   initial_thread->tid = allocate_tid ();
 }
 
+bool
+thread_priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *thread_a = list_entry(a, struct thread, elem);
+  struct thread *thread_b = list_entry(b, struct thread, elem);
+
+  return thread_a->priority > thread_b->priority;
+}
+
+
 /* Starts preemptive thread scheduling by enabling interrupts.
    Also creates the idle thread. */
 void
@@ -148,6 +158,17 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+
+  if (!list_empty(&ready_list)) {
+    struct thread *highest_priority_thread = list_entry(list_front(&ready_list), struct thread, elem);
+    if (highest_priority_thread->priority > thread_current()->priority) {
+      if (!intr_context()) {
+        thread_yield();
+      } else {
+        intr_yield_on_return();
+      }
+    }
+  }
 }
 
 /* Prints thread statistics. */
@@ -256,8 +277,9 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem, thread_priority_compare, NULL);
   t->status = THREAD_READY;
+
   intr_set_level (old_level);
 }
 
@@ -327,8 +349,9 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur->elem, thread_priority_compare, NULL);
   cur->status = THREAD_READY;
+
   schedule ();
   intr_set_level (old_level);
 }
@@ -354,7 +377,20 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  enum intr_level old_level = intr_disable();
+  bool priority_was_lowered = thread_current ()->priority > new_priority;
   thread_current ()->priority = new_priority;
+
+  if (priority_was_lowered) {
+    if (!list_empty(&ready_list)) {
+      if (new_priority < list_entry(list_front(&ready_list), struct thread, elem)->priority) {
+        thread_yield();
+      }
+    }
+  }
+
+  intr_set_level(old_level);
+
 }
 
 /* Returns the current thread's priority. */
