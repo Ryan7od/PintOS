@@ -142,4 +142,7 @@ int thread_get_load_avg (void);
 // Compares the priority of two threads a and b and returns true if a's priority > b's
 bool thread_priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
+// Regulates the priority hierarchy, yields if current thread priority < priority of first ready thread
+void thread_priority_regulate(void);
+
 #endif /* threads/thread.h */

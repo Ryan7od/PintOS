@@ -41,6 +41,14 @@
 
    - up or "V": increment the value (and wake up one waiting
      thread, if any). */
+
+     /* One semaphore in a list. */
+struct semaphore_elem 
+{
+    struct list_elem elem;              /* List element. */
+    struct semaphore semaphore;         /* This semaphore. */
+};
+
 void
 sema_init (struct semaphore *sema, unsigned value) 
 {
@@ -246,6 +254,8 @@ lock_release (struct lock *lock)
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+  
+  thread_priority_regulate();
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -258,13 +268,6 @@ lock_held_by_current_thread (const struct lock *lock)
 
   return lock->holder == thread_current ();
 }
-
-/* One semaphore in a list. */
-struct semaphore_elem 
-  {
-    struct list_elem elem;              /* List element. */
-    struct semaphore semaphore;         /* This semaphore. */
-  };
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
