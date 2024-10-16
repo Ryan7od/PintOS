@@ -61,14 +61,6 @@ sema_priority_compare (const struct list_elem *sema_a, const struct list_elem *s
 
    - up or "V": increment the value (and wake up one waiting
      thread, if any). */
-
-     /* One semaphore in a list. */
-struct semaphore_elem 
-{
-    struct list_elem elem;              /* List element. */
-    struct semaphore semaphore;         /* This semaphore. */
-};
-
 void
 sema_init (struct semaphore *sema, unsigned value) 
 {
@@ -85,19 +77,6 @@ sema_init (struct semaphore *sema, unsigned value)
    interrupt handler.  This function may be called with
    interrupts disabled, but if it sleeps then the next scheduled
    thread will probably turn interrupts back on. */
-
-bool
-sema_priority_compare (const struct list_elem *sema_a, const struct list_elem *sema_b, void *aux UNUSED)
-{
-  struct semaphore_elem *sema_elem_a = list_entry(sema_a, struct semaphore_elem, elem);
-  struct semaphore_elem *sema_elem_b = list_entry(sema_b, struct semaphore_elem, elem);
-
-  struct thread *thread_a = list_entry(list_front(&sema_elem_a->semaphore.waiters), struct thread, elem);
-  struct thread *thread_b = list_entry(list_front(&sema_elem_b->semaphore.waiters), struct thread, elem);
-
-  return thread_a->priority > thread_b->priority;
-}
-   
 void
 sema_down (struct semaphore *sema) 
 {
@@ -150,26 +129,14 @@ void
 sema_up (struct semaphore *sema) 
 {
   enum intr_level old_level;
-  struct thread *t = NULL;
 
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) {
-    t = list_entry (list_pop_front (&sema->waiters), struct thread, elem);
-    thread_unblock(t);
-  }
-
+  if (!list_empty (&sema->waiters)) 
+    thread_unblock (list_entry (list_pop_front (&sema->waiters),
+                                struct thread, elem));
   sema->value++;
-
-//  if (t != NULL && thread_current()->priority < t->priority) {
-//    if (intr_context()) {
-//      intr_yield_on_return();
-//    } else {
-//      thread_yield();
-//    }
-//  }
-
   intr_set_level (old_level);
 }
 
@@ -286,8 +253,6 @@ lock_release (struct lock *lock)
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
-  
-  thread_priority_regulate();
 }
 
 /* Returns true if the current thread holds LOCK, false
