@@ -268,17 +268,17 @@ thread_unblock (struct thread *t)
 
   struct thread* cur = thread_current();
 
-  if (cur->priority < t->priority) {
-    if (intr_get_level() == INTR_ON) {
-
-    } else {
-
-    }
-  } else {
-    list_insert_ordered(&ready_list, &t->elem, thread_priority_compare, NULL);
+  list_insert_ordered(&ready_list, &t->elem, thread_priority_compare, NULL);
+  t->status = THREAD_READY;
+  if (!intr_context()) {
+        thread_yield();
+      } else {
+        intr_yield_on_return();
+      }
   }
 
-  t->status = THREAD_READY;
+  if (cur->priority < t->priority) {
+
   intr_set_level (old_level);
 }
 
@@ -350,7 +350,14 @@ thread_yield (void)
   if (cur != idle_thread) 
     list_insert_ordered(&ready_list, &cur->elem, thread_priority_compare, NULL);
   cur->status = THREAD_READY;
-  schedule ();
+
+  if (!list_empty(&ready_list)) {
+    struct thread *next = list_entry(list_front(&ready_list), struct thread, elem);
+    if (next->priority > cur->priority) {
+      schedule();
+    }
+  }
+
   intr_set_level (old_level);
 }
 

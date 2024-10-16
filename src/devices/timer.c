@@ -96,10 +96,10 @@ timer_elapsed (int64_t then)
 bool
 wakeTimeSort (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
-    struct sleepingThread *ta = list_entry(a, struct sleepingThread, sleepElem);
-    struct sleepingThread *tb = list_entry(b, struct sleepingThread, sleepElem);
+  struct sleepingThread *ta = list_entry(a, struct sleepingThread, sleepElem);
+  struct sleepingThread *tb = list_entry(b, struct sleepingThread, sleepElem);
 
-    return ta->wakeTime < tb->wakeTime;
+  return ta->wakeTime < tb->wakeTime;
 }
 
 /* Adds a sleep thread element to the sleep list */
