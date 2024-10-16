@@ -404,7 +404,7 @@ thread_set_priority (int new_priority)
 
   if (priority_was_lowered) {
     if (!list_empty(&ready_list)) {
-      if (new_priority < list_entry(list_front(&ready_list), struct thread, elem)) {
+      if (new_priority < list_entry(list_front(&ready_list), struct thread, elem)->priority) {
         thread_yield();
       }
     }
