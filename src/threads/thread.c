@@ -84,6 +84,22 @@ static tid_t allocate_tid (void);
 
    It is not safe to call thread_current() until this function
    finishes. */
+
+void 
+thread_priority_regulate(void)
+{
+  enum intr_level old_level = intr_disable();
+
+  if (!list_empty(&ready_list)) {
+    struct thread *highest_priority_thread = list_entry(list_front(&ready_list), struct thread, elem);
+    if (highest_priority_thread->priority > thread_current()->priority) {
+      thread_yield();
+    }
+  }
+
+  intr_set_level(old_level);
+}
+
 void
 thread_init (void) 
 {
