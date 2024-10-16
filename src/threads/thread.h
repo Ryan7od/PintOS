@@ -139,4 +139,7 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+// Compares the priority of two threads a and b and returns true if a's priority > b's
+bool thread_priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
 #endif /* threads/thread.h */
