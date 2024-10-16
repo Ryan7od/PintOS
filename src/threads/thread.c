@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/fixed-point.h"
 #include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -46,7 +47,7 @@ struct kernel_thread_frame
     void *aux;                  /* Auxiliary data for function. */
   };
 
-int load_avg;
+fixed_t load_avg;
 
 /* Statistics. */
 static long long idle_ticks;    /* # of timer ticks spent idle. */
@@ -151,7 +152,7 @@ thread_tick (void)
   struct thread *t = thread_current ();
 
   if (timer_ticks() % TIMER_FREQ == 0) {
-    load_avg = (59/60)*load_avg + (1/60)*list_size(&ready_list);
+    load_avg = product_fp((fixed_t)(59/60), load_avg) + (fixed_t)(1/60)*list_size(&ready_list);
   } 
 
   /* Update statistics. */
@@ -428,7 +429,7 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void) 
 {
-  return 100 * load_avg;
+  return ROUND_TO_NEAREST(product_fp_int(load_avg, 100));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */

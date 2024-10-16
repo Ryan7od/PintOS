@@ -4,7 +4,7 @@
 #define F 1 << FRACTION
 #define INT_TO_FIXED(n) n * F
 #define ROUND_TO_ZERO(x) x / F
-#define ROUND_TO_NEAREST(x) if (x >= 0) {(x + F/2)} else {(x - F/2)}
+#define ROUND_TO_NEAREST(x) (x >= 0) ? (x + F/2) : (x - F/2)
 
 typedef int32_t fixed_t;
 
