@@ -32,6 +32,26 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+/* One semaphore in a list. */
+struct semaphore_elem 
+  {
+    struct list_elem elem;              /* List element. */
+    struct semaphore semaphore;         /* This semaphore. */
+  };
+
+bool
+sema_priority_compare (const struct list_elem *sema_a, const struct list_elem *sema_b, void *aux UNUSED)
+{
+  struct semaphore_elem *sema_elem_a = list_entry(sema_a, struct semaphore_elem, elem);
+  struct semaphore_elem *sema_elem_b = list_entry(sema_b, struct semaphore_elem, elem);
+
+  struct thread *thread_a = list_entry(list_front(&sema_elem_a->semaphore.waiters), struct thread, elem);
+  struct thread *thread_b = list_entry(list_front(&sema_elem_b->semaphore.waiters), struct thread, elem);
+
+  return thread_a->priority > thread_b->priority;
+}
+
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
