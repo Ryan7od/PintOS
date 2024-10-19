@@ -160,14 +160,10 @@ thread_tick (void)
     intr_yield_on_return ();
 
   if (!list_empty(&ready_list)) {
-    struct thread *highest_priority_thread = list_entry(list_front(&ready_list), struct thread, elem);
-    if (highest_priority_thread->priority > thread_current()->priority) {
-      if (!intr_context()) {
-        thread_yield();
-      } else {
-        intr_yield_on_return();
+      struct thread *high = list_entry(list_front(&ready_list), struct thread, elem);
+      if (high->effective_priority > thread_current()->effective_priority) {
+          intr_yield_on_return();
       }
-    }
   }
 }
 
