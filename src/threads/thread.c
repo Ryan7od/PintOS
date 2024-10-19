@@ -280,6 +280,10 @@ thread_unblock (struct thread *t)
   list_insert_ordered(&ready_list, &t->elem, thread_priority_compare, NULL);
   t->status = THREAD_READY;
 
+//  if (t->effective_priority > thread_current()->effective_priority) {
+//      thread_yield();
+//  }
+
   intr_set_level (old_level);
 }
 
