@@ -159,12 +159,7 @@ thread_tick (void)
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
 
-  if (!list_empty(&ready_list)) {
-      struct thread *high = list_entry(list_front(&ready_list), struct thread, elem);
-      if (high->effective_priority > thread_current()->effective_priority) {
-          intr_yield_on_return();
-      }
-  }
+  preemptive_priority_check();
 }
 
 /* Prints thread statistics. */
@@ -237,6 +232,8 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  preemptive_priority_check();
+
   return tid;
 }
 
@@ -276,9 +273,7 @@ thread_unblock (struct thread *t)
   list_insert_ordered(&ready_list, &t->elem, thread_priority_compare, NULL);
   t->status = THREAD_READY;
 
-//  if (t->effective_priority > thread_current()->effective_priority) {
-//      thread_yield();
-//  }
+//  preemptive_priority_check();
 
   intr_set_level (old_level);
 }
@@ -379,16 +374,10 @@ thread_set_priority (int new_priority)
 {
   struct thread *current = thread_current();
   enum intr_level old_level = intr_disable();
-  current->effective_priority = new_priority;
+  current->priority = new_priority;
   calculate_new_effective_priority(current);
 
-  if (!list_empty(&ready_list)) {
-      struct thread *high = list_entry(list_front(&ready_list),
-      struct thread, elem);
-      if (high->effective_priority > current->effective_priority) {
-          thread_yield();
-      }
-  }
+  preemptive_priority_check();
 
   intr_set_level(old_level);
 
@@ -663,6 +652,19 @@ void calculate_new_effective_priority (struct thread *t) {
     t->effective_priority = max;
 
     intr_set_level(old_level);
+}
+
+void preemptive_priority_check (void) {
+    if (!list_empty(&ready_list)) {
+        struct thread *high = list_entry(list_front(&ready_list), struct thread, elem);
+        if (high->effective_priority > thread_current()->effective_priority) {
+            if (!intr_context()) {
+                thread_yield();
+            } else {
+                intr_yield_on_return();
+            }
+        }
+    }
 }
 
 /* Offset of `stack' member within `struct thread'.

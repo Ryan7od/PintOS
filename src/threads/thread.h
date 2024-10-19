@@ -115,6 +115,7 @@ extern bool thread_mlfqs;
 void thread_init (void);
 
 bool thread_priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
+void preemptive_priority_check (void);
 
 void thread_start (void);
 size_t threads_ready(void);
