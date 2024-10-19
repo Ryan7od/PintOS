@@ -524,6 +524,7 @@ init_thread (struct thread *t, const char *name, int priority)
   list_push_back (&all_list, &t->allelem);
 
   list_init(&t->held_locks);
+  lock_init(t->waiting_on);
 
   intr_set_level (old_level);
 }
