@@ -378,7 +378,6 @@ void
 thread_set_priority (int new_priority) 
 {
   enum intr_level old_level = intr_disable();
-  bool priority_was_lowered = thread_current ()->priority > new_priority;
   thread_current ()->priority = new_priority;
 
   if (priority_was_lowered) {
@@ -637,6 +636,21 @@ allocate_tid (void)
   lock_release (&tid_lock);
 
   return tid;
+}
+
+void calculate_new_effective_priority (struct thread *t) {
+    int max = t->priority;
+    struct list_elem *waiter_elem;
+
+    for (waiter_elem = list_begin(&t->held_locks);
+         waiter_elem != list_end(&t->held_locks);
+         waiter_elem = list_next(waiter_elem)) {
+        struct lock *lock = list_entry(waiter_elem, struct lock, hold_list_elem);
+        struct thread *high = list_entry(list_pop_front(lock->semaphore.waiters), struct thread, elem);
+        if (high->effective_priority > max) {
+            max = high -> effective_priority;
+        }
+    }
 }
 
 /* Offset of `stack' member within `struct thread'.

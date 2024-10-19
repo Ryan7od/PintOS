@@ -153,4 +153,6 @@ bool thread_priority_compare (const struct list_elem *a, const struct list_elem 
 // Regulates the priority hierarchy, yields if current thread priority < priority of first ready thread
 void thread_priority_regulate(void);
 
+void calculate_new_effective_priority (struct thread *t);
+
 #endif /* threads/thread.h */
