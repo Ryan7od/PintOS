@@ -646,8 +646,8 @@ void calculate_new_effective_priority (struct thread *t) {
     for (waiter_elem = list_begin(&t->held_locks);
          waiter_elem != list_end(&t->held_locks);
          waiter_elem = list_next(waiter_elem)) {
-        struct lock *lock = list_entry(waiter_elem, struct lock, hold_list_elem);
-        struct thread *high = list_entry(list_pop_front(lock->semaphore.waiters), struct thread, elem);
+        struct lock *lock = list_entry(waiter_elem, struct lock, held_locks_elem);
+        struct thread *high = list_entry(list_pop_front(&lock->semaphore.waiters), struct thread, elem);
         if (high->effective_priority > max) {
             max = high -> effective_priority;
         }
