@@ -641,6 +641,8 @@ allocate_tid (void)
 }
 
 void calculate_new_effective_priority (struct thread *t) {
+    enum intr_level old_level = intr_disable();
+
     int max = t->priority;
     struct list_elem *waiter_elem;
 
@@ -657,6 +659,8 @@ void calculate_new_effective_priority (struct thread *t) {
             }
         }
     }
+
+    intr_set_level(old_level);
 }
 
 /* Offset of `stack' member within `struct thread'.

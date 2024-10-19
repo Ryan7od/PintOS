@@ -45,6 +45,13 @@ sema_priority_compare (const struct list_elem *sema_a, const struct list_elem *s
   struct semaphore_elem *sema_elem_a = list_entry(sema_a, struct semaphore_elem, elem);
   struct semaphore_elem *sema_elem_b = list_entry(sema_b, struct semaphore_elem, elem);
 
+  if (list_empty(&sema_elem_b->semaphore.waiters)) {
+      return true;
+  }
+  if (list_empty(&sema_elem_a->semaphore.waiters)) {
+      return false;
+  }
+
   struct thread *thread_a = list_entry(list_front(&sema_elem_a->semaphore.waiters), struct thread, elem);
   struct thread *thread_b = list_entry(list_front(&sema_elem_b->semaphore.waiters), struct thread, elem);
 
