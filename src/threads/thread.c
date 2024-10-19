@@ -379,14 +379,17 @@ thread_set_priority (int new_priority)
 {
   struct thread *current = thread_current();
   enum intr_level old_level = intr_disable();
-  current->priority = new_priority;
+  current->effective_priority = new_priority;
   calculate_new_effective_priority(current);
 
   list_sort(&ready_list, thread_priority_compare, NULL);
 
-  struct thread *high = list_entry(list_pop_front(&ready_list), struct thread, elem);
-  if (high->effective_priority > current->effective_priority) {
-      thread_yield();
+  if (!list_empty(&ready_list)) {
+//      struct thread *high = list_entry(list_pop_front(&ready_list),
+//      struct thread, elem);
+//      if (high->effective_priority > current->effective_priority) {
+//          //thread_yield();
+//      }
   }
 
   intr_set_level(old_level);
