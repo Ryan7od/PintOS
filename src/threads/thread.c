@@ -660,6 +660,8 @@ void calculate_new_effective_priority (struct thread *t) {
         }
     }
 
+    t->effective_priority = max;
+
     intr_set_level(old_level);
 }
 
