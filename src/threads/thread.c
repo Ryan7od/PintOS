@@ -525,7 +525,7 @@ init_thread (struct thread *t, const char *name, int priority)
   list_push_back (&all_list, &t->allelem);
 
   list_init(&t->held_locks);
-  lock_init(&t->waiting_on);
+  t->waiting_on = NULL;
 
   intr_set_level (old_level);
 }
@@ -648,9 +648,13 @@ void calculate_new_effective_priority (struct thread *t) {
          waiter_elem != list_end(&t->held_locks);
          waiter_elem = list_next(waiter_elem)) {
         struct lock *lock = list_entry(waiter_elem, struct lock, held_locks_elem);
-        struct thread *high = list_entry(list_front(&lock->semaphore.waiters), struct thread, elem);
-        if (high->effective_priority > max) {
-            max = high -> effective_priority;
+        if (!list_empty(&lock->semaphore.waiters)) {
+            struct thread *high = list_entry(
+                    list_front(&lock->semaphore.waiters),
+            struct thread, elem);
+            if (high->effective_priority > max) {
+                max = high->effective_priority;
+            }
         }
     }
 }
