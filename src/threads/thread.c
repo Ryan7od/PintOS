@@ -158,8 +158,6 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
-
-//  preemptive_priority_check();
 }
 
 /* Prints thread statistics. */
@@ -272,8 +270,6 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_insert_ordered(&ready_list, &t->elem, thread_priority_compare, NULL);
   t->status = THREAD_READY;
-
-//  preemptive_priority_check();
 
   intr_set_level (old_level);
 }
