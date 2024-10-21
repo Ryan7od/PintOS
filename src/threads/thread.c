@@ -91,6 +91,33 @@ static tid_t allocate_tid (void);
 
    It is not safe to call thread_current() until this function
    finishes. */
+
+void
+priority_calculate (struct thread *t, void *aux)
+{
+  
+  fixed_t new_priority = PRI_MAX - quotient_fp_int(recent_cpu, 4) - (t->niceness * 2);
+  int truncated_new_priority = MIN(63, MAX(0,ROUND_TO_NEAREST(new_priority)));
+
+  thread_set_priority_mlfqs(t, truncated_new_priority);
+}
+
+void
+thread_set_priority_mlfqs (struct thread *t, int new_priority) {
+
+  enum intr_level old_level = intr_disable();
+
+  if (thread_current ()->tid == t->tid) {
+    thread_set_priority(new_priority);
+  } else {
+  t->priority = new_priority;
+  list_remove(&t->elem);
+  list_insert_ordered(&ready_list, &t->elem, thread_priority_compare, NULL);
+  }
+
+  intr_set_level(old_level);
+}
+
 void
 thread_init (void) 
 {
@@ -107,7 +134,11 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
-  initial_thread->niceness = NICENESS_DEFAULT;
+
+  if (thread_mlfqs) {
+    initial_thread->niceness = NICENESS_DEFAULT;
+    priority_calculate(thread_current(), NULL);
+  }
 }
 
 bool
@@ -118,27 +149,6 @@ thread_priority_compare (const struct list_elem *a, const struct list_elem *b, v
 
   return thread_a->priority > thread_b->priority;
 }
-
-bool
-thread_priority_calculate (void)
-{
-  struct thread *current = thread_current ();
-  fixed_t new_priority = PRI_MAX - quotient_fp_int(recent_cpu, 4) - (current->niceness * 2);
-  int truncated_new_priority = MIN(63, MAX(0,ROUND_TO_NEAREST(new_priority)));
-
-  bool priority_lower_other = false;
-
-  if (!list_empty(&ready_list)) {
-      if (truncated_new_priority < list_entry(list_front(&ready_list), struct thread, elem)->priority) {
-        priority_lower_other = true;
-      }
-  }
-
-  current->priority = truncated_new_priority;
-
-  return priority_lower_other;
-}
-
 
 /* Starts preemptive thread scheduling by enabling interrupts.
    Also creates the idle thread. */
@@ -175,10 +185,16 @@ thread_tick (void)
 {
   struct thread *t = thread_current ();
 
-  if (timer_ticks() % TIMER_FREQ == 0) {
-    load_avg = product_fp((fixed_t)(59/60), load_avg) + (fixed_t)(1/60)*list_size(&ready_list);
-  } 
-
+  if (thread_mlfqs) {
+    
+    if (timer_ticks() % TIMER_FREQ == 0) {
+      load_avg = product_fp((fixed_t)(59/60), load_avg) + (fixed_t)(1/60)*list_size(&ready_list);
+      }
+    
+    if (thread_ticks >= TIME_SLICE) {
+      thread_foreach(priority_calculate, NULL);
+    }
+  }
   /* Update statistics. */
   if (t == idle_thread)
     idle_ticks++;
@@ -438,15 +454,10 @@ thread_get_priority (void)
 void
 thread_set_nice (int nice) 
 {
-  enum intr_level old_level = intr_disable();
+  ASSERT(thread_mlfqs == true);
+
   thread_current ()->niceness = nice;
-  bool priority_lower_other = thread_priority_calculate();
-
-  if (priority_lower_other) {
-        thread_yield();
-  }
-
-  intr_set_level(old_level);
+  priority_calculate(thread_current(), NULL);
 }
 
 /* Returns the current thread's nice value. */
@@ -557,8 +568,15 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
-  t->niceness = thread_current ()->niceness;
   t->magic = THREAD_MAGIC;
+  
+  if (thread_mlfqs) {
+    if (strcmp(name, "main")) {
+      t->niceness = NICENESS_DEFAULT;
+      } else {
+        t->niceness = thread_current ()->niceness;
+        }
+  }
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

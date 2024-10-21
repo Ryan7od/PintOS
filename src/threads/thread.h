@@ -121,7 +121,7 @@ extern bool thread_mlfqs;
 void thread_init (void);
 
 bool thread_priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
-bool thread_priority_calculate (void);
+void priority_calculate (struct thread *t, void *aux);
 
 void thread_start (void);
 size_t threads_ready(void);
@@ -148,6 +148,7 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+void thread_set_priority_mlfqs (struct thread *t, int new_priority);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
