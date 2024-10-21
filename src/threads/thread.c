@@ -13,6 +13,7 @@
 #include "threads/vaddr.h"
 #include "threads/fixed-point.h"
 #include "devices/timer.h"
+#include "threads/fixed-point.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -48,6 +49,8 @@ struct kernel_thread_frame
   };
 
 fixed_t load_avg;
+
+fixed_t recent_cpu;
 
 /* Statistics. */
 static long long idle_ticks;    /* # of timer ticks spent idle. */
@@ -104,6 +107,7 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  initial_thread->niceness = NICENESS_DEFAULT;
 }
 
 bool
@@ -113,6 +117,26 @@ thread_priority_compare (const struct list_elem *a, const struct list_elem *b, v
   struct thread *thread_b = list_entry(b, struct thread, elem);
 
   return thread_a->priority > thread_b->priority;
+}
+
+bool
+thread_priority_calculate (void)
+{
+  struct thread *current = thread_current ();
+  fixed_t new_priority = PRI_MAX - quotient_fp_int(recent_cpu, 4) - (current->niceness * 2);
+  int truncated_new_priority = MIN(63, MAX(0,ROUND_TO_NEAREST(new_priority)));
+
+  bool priority_lower_other = false;
+
+  if (!list_empty(&ready_list)) {
+      if (truncated_new_priority < list_entry(list_front(&ready_list), struct thread, elem)->priority) {
+        priority_lower_other = true;
+      }
+  }
+
+  current->priority = truncated_new_priority;
+
+  return priority_lower_other;
 }
 
 
@@ -412,17 +436,24 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice) 
 {
-  /* Not yet implemented. */
+  enum intr_level old_level = intr_disable();
+  thread_current ()->niceness = nice;
+  bool priority_lower_other = thread_priority_calculate();
+
+  if (priority_lower_other) {
+        thread_yield();
+  }
+
+  intr_set_level(old_level);
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current ()->niceness;
 }
 
 /* Returns 100 times the system load average. */
@@ -526,6 +557,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->niceness = thread_current ()->niceness;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();

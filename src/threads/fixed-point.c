@@ -1,5 +1,5 @@
-#include <stdint.h>;
-#include "threads/fixed-point.h";
+#include <stdint.h>
+#include "threads/fixed-point.h"
 
 fixed_t
 add_fp(fixed_t x, fixed_t y) 
