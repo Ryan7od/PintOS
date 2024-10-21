@@ -109,7 +109,6 @@ thread_priority_compare (const struct list_elem *a, const struct list_elem *b, v
   return thread_a->effective_priority > thread_b->effective_priority;
 }
 
-
 /* Starts preemptive thread scheduling by enabling interrupts.
    Also creates the idle thread. */
 void
