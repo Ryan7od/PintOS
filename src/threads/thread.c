@@ -50,8 +50,6 @@ struct kernel_thread_frame
 
 fixed_t load_avg;
 
-fixed_t recent_cpu;
-
 /* Statistics. */
 static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
@@ -96,7 +94,7 @@ void
 priority_calculate (struct thread *t, void *aux)
 {
   
-  fixed_t new_priority = PRI_MAX - quotient_fp_int(recent_cpu, 4) - (t->niceness * 2);
+  fixed_t new_priority = PRI_MAX - quotient_fp_int(t->recent_cpu, 4) - (t->niceness * 2);
   int truncated_new_priority = MIN(63, MAX(0,ROUND_TO_NEAREST(new_priority)));
 
   thread_set_priority_mlfqs(t, truncated_new_priority);
@@ -134,11 +132,12 @@ thread_init (void)
   initial_thread->tid = allocate_tid ();
 
   /* BSD Scheduler is used when thread_mlfqs is true. */
-  if (thread_mlfqs) {
+  /* if (thread_mlfqs) {
     load_avg = 0;
     initial_thread->niceness = NICENESS_DEFAULT;
     priority_calculate(thread_current(), NULL);
   }
+  */
 }
 
 bool
@@ -209,10 +208,11 @@ thread_tick (void)
       thread_foreach(priority_calculate, NULL);
       }
     
-    if (thread_ticks >= TIME_SLICE) {
-      thread_foreach(priority_calculate, NULL);
+    if (thread_ticks % TIME_SLICE == 0) {
+      priority_calculate(thread_current(), NULL);
     }
   }
+  
   /* Update statistics. */
   if (t == idle_thread)
     idle_ticks++;
@@ -345,6 +345,13 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
+
+  if (thread_mlfqs) {
+    priority_calculate(t, NULL);
+  }
+  
+
+
   list_insert_ordered(&ready_list, &t->elem, thread_priority_compare, NULL);
   t->status = THREAD_READY;
 
@@ -473,7 +480,7 @@ void
 thread_set_nice (int nice) 
 {
   ASSERT(thread_mlfqs == true);
-  ASSERT(nice > NICENESS_MIN && nice < NICENESS_MAX);
+  ASSERT(nice >= NICENESS_MIN && nice <= NICENESS_MAX);
 
   thread_current ()->niceness = nice;
   priority_calculate(thread_current(), NULL);
@@ -590,12 +597,14 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   
   if (thread_mlfqs) {
-    if (strcmp(name, "main")) {
+    if (strcmp(name, "main") == 0) {
       t->niceness = NICENESS_DEFAULT;
       t->recent_cpu = DEFAULT_CPU;
       } else {
         t->niceness = thread_current ()->niceness;
+        t->recent_cpu = thread_current ()->recent_cpu;
         }
+      priority_calculate(t, NULL);
   }
 
   old_level = intr_disable ();
