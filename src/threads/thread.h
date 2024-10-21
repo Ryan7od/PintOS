@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "threads/fixed-point.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -33,6 +34,8 @@ typedef int tid_t;
 #define NICENESS_MIN -20                /* Lowest niceness. */
 #define NICENESS_DEFAULT 0              /* Default niceness. */
 #define NICENESS_MAX 20                 /* Highest niceness. */
+
+#define DEFAULT_CPU 0;                  /* Default CPU. */
 
 /* A kernel thread or user process.
 
@@ -99,6 +102,7 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     int niceness;                       /* Niceness. */
+    fixed_t recent_cpu;                 /* Recent CPU. */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -154,6 +158,8 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void update_cpu (struct thread *t, void *aux UNUSED);
 
 // Regulates the priority hierarchy, yields if current thread priority < priority of first ready thread
 void thread_priority_regulate(void);
