@@ -123,8 +123,6 @@ thread_init (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
 
-  load_avg = 0;
-
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
@@ -135,7 +133,9 @@ thread_init (void)
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
 
+  /* BSD Scheduler is used when thread_mlfqs is true. */
   if (thread_mlfqs) {
+    load_avg = 0;
     initial_thread->niceness = NICENESS_DEFAULT;
     priority_calculate(thread_current(), NULL);
   }
@@ -178,6 +178,13 @@ threads_ready (void)
   return ready_thread_count;
 }
 
+void
+update_cpu (struct thread *t, void *aux UNUSED)
+{
+  fixed_t coeff_cpu = quotient_fp(product_fp_int(load_avg, 2), add_fp_int(product_fp_int(load_avg, 2), 1));
+  t->recent_cpu = add_fp_int(coeff_cpu, t->niceness); 
+}
+
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
@@ -186,9 +193,20 @@ thread_tick (void)
   struct thread *t = thread_current ();
 
   if (thread_mlfqs) {
+
+    thread_current()->recent_cpu = add_fp_int(thread_current()->recent_cpu, 1);
     
     if (timer_ticks() % TIMER_FREQ == 0) {
-      load_avg = product_fp((fixed_t)(59/60), load_avg) + (fixed_t)(1/60)*list_size(&ready_list);
+
+       int num_of_ready = list_size(&ready_list);
+       if (thread_current() != idle_thread) {
+        num_of_ready++;
+        }
+
+      load_avg = product_fp((fixed_t)(59/60), load_avg) + product_fp((fixed_t)(1/60), INT_TO_FIXED(num_of_ready));
+
+      thread_foreach(update_cpu, NULL);
+      thread_foreach(priority_calculate, NULL);
       }
     
     if (thread_ticks >= TIME_SLICE) {
@@ -455,6 +473,7 @@ void
 thread_set_nice (int nice) 
 {
   ASSERT(thread_mlfqs == true);
+  ASSERT(nice > NICENESS_MIN && nice < NICENESS_MAX);
 
   thread_current ()->niceness = nice;
   priority_calculate(thread_current(), NULL);
@@ -573,6 +592,7 @@ init_thread (struct thread *t, const char *name, int priority)
   if (thread_mlfqs) {
     if (strcmp(name, "main")) {
       t->niceness = NICENESS_DEFAULT;
+      t->recent_cpu = DEFAULT_CPU;
       } else {
         t->niceness = thread_current ()->niceness;
         }
