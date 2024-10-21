@@ -275,7 +275,8 @@ lock_try_acquire (struct lock *lock)
 
   success = sema_try_down (&lock->semaphore);
   if (success) {
-      list_push_back(&thread_current()->held_locks, &lock->held_locks_elem);
+      if (!thread_mlfqs)
+        list_push_back(&thread_current()->held_locks, &lock->held_locks_elem);
       lock->holder = thread_current();
   }
   return success;
