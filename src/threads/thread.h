@@ -4,6 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include "threads/fixed-point.h"
 #include "synch.h"
 
 /* States in a thread's life cycle. */
@@ -20,10 +22,21 @@ enum thread_status
 typedef int tid_t;
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
 
+/* Utility for calculating new priority */
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+
 /* Thread priorities. */
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+/* Thread niceness. */
+#define NICENESS_MIN -20                /* Lowest niceness. */
+#define NICENESS_DEFAULT 0              /* Default niceness. */
+#define NICENESS_MAX 20                 /* Highest niceness. */
+
+#define DEFAULT_CPU 0;                  /* Default CPU. */
 
 /* A kernel thread or user process.
 
@@ -89,7 +102,10 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int niceness;                       /* Niceness. */
+    fixed_t recent_cpu;                 /* Recent CPU. */
     int effective_priority;
+
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -115,6 +131,7 @@ extern bool thread_mlfqs;
 void thread_init (void);
 
 bool thread_priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
+void priority_calculate (struct thread *t, void *aux);
 void preemptive_priority_check (void);
 
 void thread_start (void);
@@ -142,14 +159,14 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+void thread_set_priority_mlfqs (struct thread *t, int new_priority);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-// Compares the priority of two threads a and b and returns true if a's priority > b's
-bool thread_priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+void update_cpu (struct thread *t, void *aux UNUSED);
 
 // Regulates the priority hierarchy, yields if current thread priority < priority of first ready thread
 void thread_priority_regulate(void);
