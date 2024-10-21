@@ -290,10 +290,12 @@ lock_release (struct lock *lock)
 
   enum intr_level old_level = intr_disable();
 
-  list_remove(&lock->held_locks_elem);
-  calculate_new_effective_priority(lock->holder);
-  lock->holder = NULL;
+  if (!thread_mlfqs) {
+      list_remove(&lock->held_locks_elem);
+      calculate_new_effective_priority(lock->holder);
+  }
 
+  lock->holder = NULL;
   sema_up (&lock->semaphore);
 
   intr_set_level (old_level);
