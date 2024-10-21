@@ -370,7 +370,10 @@ thread_set_priority (int new_priority)
   struct thread *current = thread_current();
   enum intr_level old_level = intr_disable();
   current->priority = new_priority;
-  calculate_new_effective_priority(current);
+  current->effective_priority = new_priority;
+
+  if (!thread_mlfqs)
+    calculate_new_effective_priority(current);
 
   preemptive_priority_check();
 
