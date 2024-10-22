@@ -105,13 +105,11 @@ thread_set_priority_mlfqs (struct thread *t, int new_priority) {
 
   enum intr_level old_level = intr_disable();
 
-  if (thread_current ()->tid == t->tid) {
-    thread_set_priority(new_priority);
-  } else {
   t->priority = new_priority;
-  list_remove(&t->elem);
-  list_insert_ordered(&ready_list, &t->elem, thread_priority_compare, NULL);
-  }
+  t->effective_priority = new_priority;
+  list_sort(&ready_list, thread_priority_compare, NULL);
+
+  preemptive_priority_check();
 
   intr_set_level(old_level);
 }
@@ -132,12 +130,12 @@ thread_init (void)
   initial_thread->tid = allocate_tid ();
 
   /* BSD Scheduler is used when thread_mlfqs is true. */
-  /* if (thread_mlfqs) {
+  if (thread_mlfqs) {
     load_avg = 0;
     initial_thread->niceness = NICENESS_DEFAULT;
     priority_calculate(thread_current(), NULL);
   }
-  */
+  
 }
 
 bool
@@ -201,8 +199,11 @@ thread_tick (void)
        if (thread_current() != idle_thread) {
         num_of_ready++;
         }
+      printf("%i", num_of_ready);
+      fixed_t coeff1 = fraction_to_fp(59, 60);
+      fixed_t coeff2 = fraction_to_fp(1, 60);
 
-      load_avg = product_fp((fixed_t)(59/60), load_avg) + product_fp((fixed_t)(1/60), INT_TO_FIXED(num_of_ready));
+      load_avg = add_fp(product_fp(coeff1, load_avg), product_fp(coeff2, INT_TO_FIXED(num_of_ready)));
 
       thread_foreach(update_cpu, NULL);
       thread_foreach(priority_calculate, NULL);
