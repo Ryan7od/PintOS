@@ -13,7 +13,6 @@
 #include "threads/vaddr.h"
 #include "threads/fixed-point.h"
 #include "devices/timer.h"
-#include "threads/fixed-point.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -203,15 +202,15 @@ thread_tick (void)
     
     if (timer_ticks() % TIMER_FREQ == 0) {
 
-       int num_of_ready = list_size(&ready_list);
+       int num_ready_threads = list_size(&ready_list);
        if (thread_current() != idle_thread) {
-        num_of_ready++;
+        num_ready_threads++;
         }
         
       fixed_t coeff1 = fraction_to_fp(59, 60);
       fixed_t coeff2 = fraction_to_fp(1, 60);
 
-      load_avg = add_fp(product_fp(coeff1, load_avg), product_fp(coeff2, INT_TO_FIXED(num_of_ready)));
+      load_avg = add_fp(product_fp(coeff1, load_avg), product_fp(coeff2, INT_TO_FIXED(num_ready_threads)));
 
       thread_foreach(update_cpu, NULL);
       thread_foreach(priority_calculate, NULL);
