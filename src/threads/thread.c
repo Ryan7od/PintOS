@@ -207,7 +207,7 @@ thread_tick (void)
        if (thread_current() != idle_thread) {
         num_of_ready++;
         }
-      printf("%i", num_of_ready);
+        
       fixed_t coeff1 = fraction_to_fp(59, 60);
       fixed_t coeff2 = fraction_to_fp(1, 60);
 
