@@ -94,8 +94,8 @@ void
 priority_calculate (struct thread *t, void *aux)
 {
   
-  fixed_t new_priority = PRI_MAX - quotient_fp_int(t->recent_cpu, 4) - (t->niceness * 2);
-  int truncated_new_priority = MIN(63, MAX(0,ROUND_TO_NEAREST(new_priority)));
+  fixed_t new_priority = subtract_fp(INT_TO_FIXED(PRI_MAX), subtract_fp_int(quotient_fp_int(t->recent_cpu, 4), (t->niceness * 2)));
+  int truncated_new_priority = MIN(PRI_MAX, MAX(PRI_MIN, ROUND_TO_NEAREST(new_priority)));
 
   thread_set_priority_mlfqs(t, truncated_new_priority);
 }
@@ -179,7 +179,7 @@ void
 update_cpu (struct thread *t, void *aux UNUSED)
 {
   fixed_t coeff_cpu = quotient_fp(product_fp_int(load_avg, 2), add_fp_int(product_fp_int(load_avg, 2), 1));
-  t->recent_cpu = add_fp_int(coeff_cpu, t->niceness); 
+  t->recent_cpu = add_fp_int(product_fp(coeff_cpu, t->recent_cpu), t->niceness); 
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -191,7 +191,9 @@ thread_tick (void)
 
   if (thread_mlfqs) {
 
+    if (t != idle_thread) {
     thread_current()->recent_cpu = add_fp_int(thread_current()->recent_cpu, 1);
+    }
     
     if (timer_ticks() % TIMER_FREQ == 0) {
 
@@ -474,6 +476,7 @@ thread_set_nice (int nice)
 
   thread_current ()->niceness = nice;
   priority_calculate(thread_current(), NULL);
+
 }
 
 /* Returns the current thread's nice value. */
@@ -494,8 +497,7 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return ROUND_TO_NEAREST(product_fp_int(thread_current ()->recent_cpu, 100));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
