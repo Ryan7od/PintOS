@@ -100,7 +100,9 @@ priority_calculate (struct thread *t, void *aux)
       INT_TO_FIXED(t->niceness * 2)
     )
   );
-  int truncated_new_priority = MIN(PRI_MAX, MAX(PRI_MIN, ROUND_TO_NEAREST(new_priority)));
+  int truncated_new_priority = MIN(
+    PRI_MAX, 
+    MAX(PRI_MIN, ROUND_TO_NEAREST(new_priority)));
 
   thread_set_priority_mlfqs(t, truncated_new_priority);
 }
@@ -144,7 +146,9 @@ thread_init (void)
 }
 
 bool
-thread_priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+thread_priority_compare (const struct list_elem *a, 
+                         const struct list_elem *b, 
+                         void *aux UNUSED)
 {
   struct thread *thread_a = list_entry(a, struct thread, elem);
   struct thread *thread_b = list_entry(b, struct thread, elem);
@@ -183,8 +187,15 @@ threads_ready (void)
 void
 update_cpu (struct thread *t, void *aux UNUSED)
 {
-  fixed_t coeff_cpu = quotient_fp(product_fp_int(load_avg, 2), add_fp_int(product_fp_int(load_avg, 2), 1));
-  t->recent_cpu = add_fp_int(product_fp(coeff_cpu, t->recent_cpu), t->niceness); 
+  fixed_t coeff_cpu = quotient_fp(
+    product_fp_int(load_avg, 2), 
+    add_fp_int(product_fp_int(load_avg, 2), 1)
+  );
+
+  t->recent_cpu = add_fp_int(
+    product_fp(coeff_cpu, t->recent_cpu), 
+    t->niceness
+  ); 
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -197,24 +208,29 @@ thread_tick (void)
   if (thread_mlfqs) {
 
     if (t != idle_thread) {
-    thread_current()->recent_cpu = add_fp_int(thread_current()->recent_cpu, 1);
+      thread_current()->recent_cpu = add_fp_int(
+          thread_current()->recent_cpu, 
+          1
+      );
     }
     
     if (timer_ticks() % TIMER_FREQ == 0) {
-
-       int num_ready_threads = list_size(&ready_list);
-       if (thread_current() != idle_thread) {
+      int num_ready_threads = list_size(&ready_list);
+      if (thread_current() != idle_thread) {
         num_ready_threads++;
-        }
+      }
         
       fixed_t coeff1 = fraction_to_fp(59, 60);
       fixed_t coeff2 = fraction_to_fp(1, 60);
 
-      load_avg = add_fp(product_fp(coeff1, load_avg), product_fp(coeff2, INT_TO_FIXED(num_ready_threads)));
+      load_avg = add_fp(
+        product_fp(coeff1, load_avg), 
+        product_fp(coeff2, INT_TO_FIXED(num_ready_threads))
+      );
 
       thread_foreach(update_cpu, NULL);
       thread_foreach(priority_calculate, NULL);
-      }
+    }
     
     if (thread_ticks % TIME_SLICE == 0) {
       priority_calculate(thread_current(), NULL);
@@ -423,7 +439,12 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_insert_ordered(&ready_list, &cur->elem, thread_priority_compare, NULL);
+    list_insert_ordered(
+        &ready_list, 
+        &cur->elem, 
+        thread_priority_compare, 
+        NULL
+    );
   cur->status = THREAD_READY;
 
   schedule ();
@@ -724,7 +745,9 @@ allocate_tid (void)
   return tid;
 }
 
-void calculate_new_effective_priority (struct thread *t) {
+void 
+calculate_new_effective_priority (struct thread *t)
+{
     enum intr_level old_level = intr_disable();
 
     int max = t->priority;
@@ -733,7 +756,10 @@ void calculate_new_effective_priority (struct thread *t) {
     for (waiter_elem = list_begin(&t->held_locks);
          waiter_elem != list_end(&t->held_locks);
          waiter_elem = list_next(waiter_elem)) {
-        struct lock *lock = list_entry(waiter_elem, struct lock, held_locks_elem);
+        struct lock *lock = list_entry(waiter_elem, 
+                                       struct lock, 
+                                       held_locks_elem
+        );
         if (!list_empty(&lock->semaphore.waiters)) {
             struct thread *high = list_entry(
                     list_front(&lock->semaphore.waiters),
@@ -749,9 +775,15 @@ void calculate_new_effective_priority (struct thread *t) {
     intr_set_level(old_level);
 }
 
-void preemptive_priority_check (void) {
+void 
+preemptive_priority_check (void)
+{
     if (!list_empty(&ready_list)) {
-        struct thread *high = list_entry(list_front(&ready_list), struct thread, elem);
+        struct thread *high = list_entry(
+            list_front(&ready_list), 
+            struct thread, elem
+        );
+
         if (high->effective_priority > thread_current()->effective_priority) {
             if (!intr_context()) {
                 thread_yield();

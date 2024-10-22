@@ -40,10 +40,16 @@ struct semaphore_elem
   };
 
 bool
-sema_priority_compare (const struct list_elem *sema_a, const struct list_elem *sema_b, void *aux UNUSED)
+sema_priority_compare (const struct list_elem *sema_a, 
+                       const struct list_elem *sema_b, 
+                       void *aux UNUSED)
 {
-  struct semaphore_elem *sema_elem_a = list_entry(sema_a, struct semaphore_elem, elem);
-  struct semaphore_elem *sema_elem_b = list_entry(sema_b, struct semaphore_elem, elem);
+  struct semaphore_elem *sema_elem_a = list_entry(
+    sema_a, struct semaphore_elem, elem
+    );
+  struct semaphore_elem *sema_elem_b = list_entry(
+    sema_b, struct semaphore_elem, elem
+    );
 
   if (list_empty(&sema_elem_b->semaphore.waiters)) {
       return true;
@@ -52,8 +58,14 @@ sema_priority_compare (const struct list_elem *sema_a, const struct list_elem *s
       return false;
   }
 
-  struct thread *thread_a = list_entry(list_front(&sema_elem_a->semaphore.waiters), struct thread, elem);
-  struct thread *thread_b = list_entry(list_front(&sema_elem_b->semaphore.waiters), struct thread, elem);
+  struct thread *thread_a = list_entry(
+    list_front(&sema_elem_a->semaphore.waiters), 
+    struct thread, elem
+  );
+  struct thread *thread_b = list_entry(
+    list_front(&sema_elem_b->semaphore.waiters), 
+    struct thread, elem
+  );
 
   return thread_a->effective_priority > thread_b->effective_priority;
 }
@@ -278,9 +290,9 @@ lock_try_acquire (struct lock *lock)
 
   success = sema_try_down (&lock->semaphore);
   if (success) {
-      if (!thread_mlfqs)
-        list_push_back(&thread_current()->held_locks, &lock->held_locks_elem);
-      lock->holder = thread_current();
+    if (!thread_mlfqs)
+      list_push_back(&thread_current()->held_locks, &lock->held_locks_elem);
+    lock->holder = thread_current();
   }
   return success;
 }
