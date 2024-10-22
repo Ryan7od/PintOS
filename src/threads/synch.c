@@ -70,7 +70,6 @@ sema_priority_compare (const struct list_elem *sema_a,
   return thread_a->effective_priority > thread_b->effective_priority;
 }
 
-
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -383,7 +382,6 @@ cond_wait (struct condition *cond, struct lock *lock)
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
 }
-
 
 /* If any threads are waiting on COND (protected by LOCK), then
    this function signals one of them to wake up from its wait.

@@ -13,6 +13,7 @@
 #include "threads/vaddr.h"
 #include "threads/fixed-point.h"
 #include "devices/timer.h"
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -75,20 +76,6 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-/* Initializes the threading system by transforming the code
-   that's currently running into a thread.  This can't work in
-   general and it is possible in this case only because loader.S
-   was careful to put the bottom of the stack at a page boundary.
-
-   Also initializes the run queue and the tid lock.
-
-   After calling this function, be sure to initialize the page
-   allocator before trying to create any threads with
-   thread_create().
-
-   It is not safe to call thread_current() until this function
-   finishes. */
-
 void
 priority_calculate (struct thread *t, void *aux)
 {
@@ -121,6 +108,19 @@ thread_set_priority_mlfqs (struct thread *t, int new_priority) {
   intr_set_level(old_level);
 }
 
+/* Initializes the threading system by transforming the code
+   that's currently running into a thread.  This can't work in
+   general and it is possible in this case only because loader.S
+   was careful to put the bottom of the stack at a page boundary.
+
+   Also initializes the run queue and the tid lock.
+
+   After calling this function, be sure to initialize the page
+   allocator before trying to create any threads with
+   thread_create().
+
+   It is not safe to call thread_current() until this function
+   finishes. */
 void
 thread_init (void) 
 {
@@ -365,8 +365,6 @@ thread_unblock (struct thread *t)
     priority_calculate(t, NULL);
   }
   
-
-
   list_insert_ordered(&ready_list, &t->elem, thread_priority_compare, NULL);
   t->status = THREAD_READY;
 
@@ -745,6 +743,11 @@ allocate_tid (void)
   return tid;
 }
 
+/* Recalculates the effective priority of a thread `t`. This
+   function takes into account the thread's own priority as well
+   as the priority of threads waiting on locks held by `t`. It
+   checks each lock held by `t` and updates `t`'s effective priority
+   based on the highest effective priority of any waiting threads. */
 void 
 calculate_new_effective_priority (struct thread *t)
 {
@@ -775,6 +778,11 @@ calculate_new_effective_priority (struct thread *t)
     intr_set_level(old_level);
 }
 
+/* Checks if the current thread should yield the CPU to another thread
+   with a higher effective priority. If the highest-priority thread in
+   the ready list has a higher effective priority than the current thread,
+   the current thread will yield. This ensures preemptive scheduling based
+   on priority. */
 void 
 preemptive_priority_check (void)
 {
