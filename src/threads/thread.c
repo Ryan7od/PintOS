@@ -94,7 +94,13 @@ void
 priority_calculate (struct thread *t, void *aux)
 {
   
-  fixed_t new_priority = subtract_fp(INT_TO_FIXED(PRI_MAX), subtract_fp_int(quotient_fp_int(t->recent_cpu, 4), (t->niceness * 2)));
+  fixed_t new_priority = subtract_fp(
+    INT_TO_FIXED(PRI_MAX),
+    add_fp(
+      quotient_fp_int(t->recent_cpu, 4),
+      INT_TO_FIXED(t->niceness * 2)
+    )
+  );
   int truncated_new_priority = MIN(PRI_MAX, MAX(PRI_MIN, ROUND_TO_NEAREST(new_priority)));
 
   thread_set_priority_mlfqs(t, truncated_new_priority);
