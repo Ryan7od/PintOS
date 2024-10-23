@@ -106,13 +106,15 @@ struct thread
     fixed_t recent_cpu;                 /* Recent CPU. */
     int effective_priority;
 
-    struct list_elem allelem;           /* List element for all threads list. */
+    struct list_elem allelem;           /* List element for all threads 
+                                           list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
     struct list held_locks;             /* List of locks held by this thread */
-    struct lock *waiting_on;             /* Current lock this thread is waiting on */
+    struct lock *waiting_on;            /* Current lock this thread is 
+                                           waiting on */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -130,7 +132,11 @@ extern bool thread_mlfqs;
 
 void thread_init (void);
 
-bool thread_priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool thread_priority_compare (
+   const struct list_elem *a, 
+   const struct list_elem *b, 
+   void *aux
+);
 void priority_calculate (struct thread *t, void *aux);
 void preemptive_priority_check (void);
 
@@ -167,9 +173,6 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void update_cpu (struct thread *t, void *aux UNUSED);
-
-// Regulates the priority hierarchy, yields if current thread priority < priority of first ready thread
-void thread_priority_regulate(void);
 
 void calculate_new_effective_priority (struct thread *t);
 

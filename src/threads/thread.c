@@ -142,7 +142,6 @@ thread_init (void)
     initial_thread->niceness = NICENESS_DEFAULT;
     priority_calculate(thread_current(), NULL);
   }
-  
 }
 
 bool
