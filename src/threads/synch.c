@@ -40,10 +40,16 @@ struct semaphore_elem
   };
 
 bool
-sema_priority_compare (const struct list_elem *sema_a, const struct list_elem *sema_b, void *aux UNUSED)
+sema_priority_compare (const struct list_elem *sema_a, 
+                       const struct list_elem *sema_b, 
+                       void *aux UNUSED)
 {
-  struct semaphore_elem *sema_elem_a = list_entry(sema_a, struct semaphore_elem, elem);
-  struct semaphore_elem *sema_elem_b = list_entry(sema_b, struct semaphore_elem, elem);
+  struct semaphore_elem *sema_elem_a = list_entry(
+    sema_a, struct semaphore_elem, elem
+    );
+  struct semaphore_elem *sema_elem_b = list_entry(
+    sema_b, struct semaphore_elem, elem
+    );
 
   if (list_empty(&sema_elem_b->semaphore.waiters)) {
       return true;
@@ -52,12 +58,17 @@ sema_priority_compare (const struct list_elem *sema_a, const struct list_elem *s
       return false;
   }
 
-  struct thread *thread_a = list_entry(list_front(&sema_elem_a->semaphore.waiters), struct thread, elem);
-  struct thread *thread_b = list_entry(list_front(&sema_elem_b->semaphore.waiters), struct thread, elem);
+  struct thread *thread_a = list_entry(
+    list_front(&sema_elem_a->semaphore.waiters), 
+    struct thread, elem
+  );
+  struct thread *thread_b = list_entry(
+    list_front(&sema_elem_b->semaphore.waiters), 
+    struct thread, elem
+  );
 
   return thread_a->effective_priority > thread_b->effective_priority;
 }
-
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -95,7 +106,10 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_insert_ordered(&sema->waiters, &thread_current ()->elem, thread_priority_compare, NULL);
+      list_insert_ordered(&sema->waiters, 
+      &thread_current ()->elem, 
+      thread_priority_compare, 
+      NULL);
       thread_block ();
     }
   sema->value--;
@@ -275,9 +289,9 @@ lock_try_acquire (struct lock *lock)
 
   success = sema_try_down (&lock->semaphore);
   if (success) {
-      if (!thread_mlfqs)
-        list_push_back(&thread_current()->held_locks, &lock->held_locks_elem);
-      lock->holder = thread_current();
+    if (!thread_mlfqs)
+      list_push_back(&thread_current()->held_locks, &lock->held_locks_elem);
+    lock->holder = thread_current();
   }
   return success;
 }
@@ -359,12 +373,15 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   
   sema_init (&waiter.semaphore, 0);
-  list_insert_ordered(&cond->waiters, &waiter.elem, sema_priority_compare, NULL);
+  list_insert_ordered(
+    &cond->waiters, 
+    &waiter.elem, 
+    sema_priority_compare, 
+    NULL);
   lock_release (lock);
   sema_down (&waiter.semaphore);
   lock_acquire (lock);
 }
-
 
 /* If any threads are waiting on COND (protected by LOCK), then
    this function signals one of them to wake up from its wait.
