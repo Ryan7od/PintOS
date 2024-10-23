@@ -365,7 +365,12 @@ thread_unblock (struct thread *t)
     priority_calculate(t, NULL);
   }
   
-  list_insert_ordered(&ready_list, &t->elem, thread_priority_compare, NULL);
+  list_insert_ordered(&ready_list,
+          &t->elem, 
+          thread_priority_compare, 
+          NULL
+  );
+
   t->status = THREAD_READY;
 
   intr_set_level (old_level);
@@ -521,7 +526,9 @@ thread_get_load_avg (void)
 int
 thread_get_recent_cpu (void) 
 {
-  return ROUND_TO_NEAREST(product_fp_int(thread_current ()->recent_cpu, 100));
+  return ROUND_TO_NEAREST(
+    product_fp_int(thread_current ()->recent_cpu, 100)
+  );
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
