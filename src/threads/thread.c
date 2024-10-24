@@ -79,7 +79,6 @@ static tid_t allocate_tid (void);
 void
 priority_calculate (struct thread *t, void *aux)
 {
-  
   fixed_t new_priority = subtract_fp(
     INT_TO_FIXED(PRI_MAX),
     add_fp(
@@ -89,7 +88,7 @@ priority_calculate (struct thread *t, void *aux)
   );
   int truncated_new_priority = MIN(
     PRI_MAX, 
-    MAX(PRI_MIN, ROUND_TO_NEAREST(new_priority)));
+    MAX(PRI_MIN, ROUND_TO_ZERO (new_priority)));
 
   thread_set_priority_mlfqs(t, truncated_new_priority);
 }
