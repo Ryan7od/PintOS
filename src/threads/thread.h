@@ -110,6 +110,7 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    struct list_elem nelem;
 
     struct list held_locks;             /* List of locks held by this thread */
     struct lock *waiting_on;             /* Current lock this thread is waiting on */
