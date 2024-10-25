@@ -162,8 +162,7 @@ ready_list_front (void) {
 void
 priority_calculate (struct thread *t, void *aux)
 {
-  
-  fixed_t priority = subtract_fp(
+  fixed_t new_priority = subtract_fp(
     INT_TO_FIXED(PRI_MAX),
     add_fp(
       quotient_fp_int(t->recent_cpu, 4),
@@ -172,7 +171,7 @@ priority_calculate (struct thread *t, void *aux)
   );
   int truncated_priority = MIN(
     PRI_MAX, 
-    MAX(PRI_MIN, ROUND_TO_NEAREST(priority)));
+    MAX(PRI_MIN, ROUND_TO_ZERO (new_priority)));
 
   thread_set_priority_mlfqs(t, truncated_priority);
 }
@@ -238,7 +237,6 @@ thread_init (void)
     initial_thread->niceness = NICENESS_DEFAULT;
     priority_calculate(thread_current(), NULL);
   }
-  
 }
 
 bool

@@ -4,10 +4,9 @@
 #define F (1 << FRACTION)
 #define INT_TO_FIXED(n) ((n) * F)
 #define ROUND_TO_ZERO(x) ((x) / F)
-#define ROUND_TO_NEAREST(x) (((x) >= 0) ? ((x) + (F / 2)) / F : ((x) - (F / 2)) / F)
+#define ROUND_TO_NEAREST(x) ((x >= 0) ? (x + (F / 2)) / F : (x - (F / 2)) / F)
 
 typedef int32_t fixed_t;
-
 
 fixed_t add_fp(fixed_t x, fixed_t y);
 fixed_t subtract_fp(fixed_t x, fixed_t y);
