@@ -126,7 +126,6 @@ struct thread
 
 struct ready_list {
    struct list lists[PRI_MAX - PRI_MIN + 1];
-   int highest_priority;
    int size;
 };
 

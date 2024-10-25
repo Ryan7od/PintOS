@@ -125,16 +125,6 @@ static void ready_list_push_front(struct thread *t) {
   }
 }
 
-static void ready_list_recalculate_max() {
-  for (int i = PRI_MAX; i >= PRI_MIN; i--) {
-    if (!list_empty(&new_ready_list.lists[i - PRI_MIN])) {
-      new_ready_list.highest_priority = i;
-      return;
-    }
-  }
-  new_ready_list.highest_priority = PRI_MIN;
-}
-
 static struct list_elem *ready_list_pop_front() {
   for (int i = PRI_MAX; i >= PRI_MIN; i--) {
     if (!list_empty(&new_ready_list.lists[i - PRI_MIN])) {
@@ -144,18 +134,6 @@ static struct list_elem *ready_list_pop_front() {
   }
   ASSERT(false); // If the list is empty an error should be thrown
 }
-
-// static bool thread_in_ready_list(int priority, int tid) {
-//   struct list *lst = &new_ready_list.lists[priority - PRI_MIN];
-//   struct list elem *e;
-
-//   for (e = list_begin(lst); e != list_end(lst); e = list_next(e)) {
-//     struct thread *
-//   }
-// }
-
-
-
 
 void
 priority_calculate (struct thread *t, void *aux)
