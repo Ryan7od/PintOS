@@ -98,16 +98,30 @@ static void ready_list_init() {
 }
 
 static bool ready_list_empty() {
-  return new_ready_list.size == 0;
+  //return new_ready_list.size == 0;
+
+  for (int i = PRI_MAX; i >= PRI_MIN; i--) {
+    if (!list_empty(&new_ready_list.lists[i - PRI_MIN])) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 static void ready_list_push_back(struct thread *t) {
-  if (!is_interior(&t->nelem)) {
-    list_push_back(&new_ready_list.lists[t->effective_priority], &t->nelem);
-    new_ready_list.size++;
-    if (t->effective_priority > new_ready_list.highest_priority) {
-      new_ready_list.highest_priority = t->effective_priority;
-    }
+  list_push_back(&new_ready_list.lists[t->effective_priority], &t->nelem);
+  new_ready_list.size++;
+  if (t->effective_priority > new_ready_list.highest_priority) {
+    new_ready_list.highest_priority = t->effective_priority;
+  }
+}
+
+static void ready_list_push_front(struct thread *t) {
+  list_push_front(&new_ready_list.lists[t->effective_priority], &t->nelem);
+  new_ready_list.size++;
+  if (t->effective_priority > new_ready_list.highest_priority) {
+    new_ready_list.highest_priority = t->effective_priority;
   }
 }
 
@@ -128,7 +142,17 @@ static struct list_elem *ready_list_pop_front() {
       return list_pop_front(&new_ready_list.lists[i - PRI_MIN]);
     }
   }
+  ASSERT(false); // If the list is empty an error should be thrown
 }
+
+// static bool thread_in_ready_list(int priority, int tid) {
+//   struct list *lst = &new_ready_list.lists[priority - PRI_MIN];
+//   struct list elem *e;
+
+//   for (e = list_begin(lst); e != list_end(lst); e = list_next(e)) {
+//     struct thread *
+//   }
+// }
 
 
 
@@ -156,13 +180,22 @@ thread_set_priority_mlfqs (struct thread *t, int new_priority) {
 
   enum intr_level old_level = intr_disable();
 
+  int old_priority = t->effective_priority;
+
   t->priority = new_priority;
   t->effective_priority = new_priority;
   list_sort(&ready_list, thread_priority_compare, NULL);
 
-  if (is_interior(&t->nelem)) {
-    list_remove(&t->nelem);
-    ready_list_push_back(t);
+  if (is_interior(&t->nelem) && 
+      t->status == THREAD_READY && 
+      old_priority != new_priority) {
+    if (new_priority > old_priority) {
+       list_remove(&t->nelem);
+       ready_list_push_back(t);
+     } else if (new_priority < old_priority) {
+       list_remove(&t->nelem);
+       ready_list_push_front(t);
+     }
   }
 
   preemptive_priority_check();
@@ -728,11 +761,13 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  if (list_empty (&ready_list)) {
+  // if (list_empty (&ready_list)) {
+  if (ready_list_empty()) {
     return idle_thread;
   } else {
-    ready_list_pop_front();
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+    list_pop_front (&ready_list);
+    // ready_list_pop_front();
+    return list_entry (ready_list_pop_front(), struct thread, nelem);
   }
 }
 
@@ -862,7 +897,8 @@ calculate_new_effective_priority (struct thread *t)
 void 
 preemptive_priority_check (void)
 {
-    if (!list_empty(&ready_list)) {
+    //if (!list_empty(&ready_list)) {
+    if (!ready_list_empty()) {
         struct thread *high = list_entry(
             list_front(&ready_list), 
             struct thread, elem
