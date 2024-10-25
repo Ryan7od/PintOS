@@ -90,11 +90,20 @@ is_interior (struct list_elem *elem)
 
 static void ready_list_init() {
   new_ready_list.size = 0;
-  new_ready_list.highest_priority = PRI_MIN;
 
   for (int i = PRI_MIN; i <= PRI_MAX; i++) {
     list_init(&new_ready_list.lists[i - PRI_MIN]);
   }
+}
+
+static size_t ready_list_size() {
+  size_t size = 0;
+
+  for (int i = PRI_MAX; i >= PRI_MIN; i--) {
+    size += list_size(&new_ready_list.lists[i - PRI_MIN]);
+  }
+
+  return size;
 }
 
 static bool ready_list_empty() {
@@ -112,17 +121,11 @@ static bool ready_list_empty() {
 static void ready_list_push_back(struct thread *t) {
   list_push_back(&new_ready_list.lists[t->effective_priority], &t->nelem);
   new_ready_list.size++;
-  if (t->effective_priority > new_ready_list.highest_priority) {
-    new_ready_list.highest_priority = t->effective_priority;
-  }
 }
 
 static void ready_list_push_front(struct thread *t) {
   list_push_front(&new_ready_list.lists[t->effective_priority], &t->nelem);
   new_ready_list.size++;
-  if (t->effective_priority > new_ready_list.highest_priority) {
-    new_ready_list.highest_priority = t->effective_priority;
-  }
 }
 
 static struct list_elem *ready_list_pop_front() {
@@ -130,6 +133,15 @@ static struct list_elem *ready_list_pop_front() {
     if (!list_empty(&new_ready_list.lists[i - PRI_MIN])) {
       new_ready_list.size--;
       return list_pop_front(&new_ready_list.lists[i - PRI_MIN]);
+    }
+  }
+  ASSERT(false); // If the list is empty an error should be thrown
+}
+
+static struct list_elem *ready_list_front() {
+  for (int i = PRI_MAX; i >= PRI_MIN; i--) {
+    if (!list_empty(&new_ready_list.lists[i - PRI_MIN])) {
+      return list_front(&new_ready_list.lists[i - PRI_MIN]);
     }
   }
   ASSERT(false); // If the list is empty an error should be thrown
@@ -253,7 +265,8 @@ size_t
 threads_ready (void)
 {
   enum intr_level old_level = intr_disable ();
-  size_t ready_thread_count = list_size (&ready_list);
+  // size_t ready_thread_count = list_size (&ready_list);
+  size_t ready_thread_count = new_ready_list.size;
   intr_set_level (old_level);
   return ready_thread_count;
 }
@@ -289,7 +302,8 @@ thread_tick (void)
     }
     
     if (timer_ticks() % TIMER_FREQ == 0) {
-      int num_ready_threads = list_size(&ready_list);
+      // int num_ready_threads = list_size(&ready_list);
+      int num_ready_threads = ready_list_size();
       if (thread_current() != idle_thread) {
         num_ready_threads++;
       }
@@ -877,9 +891,13 @@ preemptive_priority_check (void)
 {
     //if (!list_empty(&ready_list)) {
     if (!ready_list_empty()) {
+        // struct thread *high = list_entry(
+        //     list_front(&ready_list), 
+        //     struct thread, elem
+        // );
         struct thread *high = list_entry(
-            list_front(&ready_list), 
-            struct thread, elem
+          ready_list_front(),
+          struct thread, nelem
         );
 
         if (high->effective_priority > thread_current()->effective_priority) {
