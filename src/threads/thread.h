@@ -124,6 +124,12 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
   };
 
+struct ready_list {
+   struct list lists[PRI_MAX - PRI_MIN + 1];
+   int highest_priority;
+   int size;
+};
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "mlfqs". */

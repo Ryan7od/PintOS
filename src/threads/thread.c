@@ -26,7 +26,7 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
-static struct list new_ready_list[PRI_MAX - PRI_MIN + 1];
+static struct ready_list new_ready_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -85,50 +85,53 @@ is_interior (struct list_elem *elem)
   return elem != NULL && elem->prev != NULL && elem->next != NULL;
 }
 
-static void ready_list_push_back(struct thread *thread) {
-  list_push_back(&new_ready_list[thread->effective_priority], &thread->nelem);
-}
 
-static void ready_list_push_front(struct thread *thread) {
-  list_push_front(&new_ready_list[thread->effective_priority], &thread->nelem);
+
+
+static void ready_list_init() {
+  new_ready_list.size = 0;
+  new_ready_list.highest_priority = PRI_MIN;
+
+  for (int i = PRI_MIN; i <= PRI_MAX; i++) {
+    list_init(&new_ready_list.lists[i - PRI_MIN]);
+  }
 }
 
 static bool ready_list_empty() {
-  for (int i = PRI_MIN; i <= PRI_MAX; i++) {
-    if (!list_empty(&new_ready_list[i])) {
-      return false;
+  return new_ready_list.size == 0;
+}
+
+static void ready_list_push_back(struct thread *t) {
+  if (!is_interior(&t->nelem)) {
+    list_push_back(&new_ready_list.lists[t->effective_priority], &t->nelem);
+    new_ready_list.size++;
+    if (t->effective_priority > new_ready_list.highest_priority) {
+      new_ready_list.highest_priority = t->effective_priority;
     }
   }
-  return true;
+}
+
+static void ready_list_recalculate_max() {
+  for (int i = PRI_MAX; i >= PRI_MIN; i--) {
+    if (!list_empty(&new_ready_list.lists[i - PRI_MIN])) {
+      new_ready_list.highest_priority = i;
+      return;
+    }
+  }
+  new_ready_list.highest_priority = PRI_MIN;
 }
 
 static struct list_elem *ready_list_pop_front() {
-	ASSERT (!ready_list_empty());
-
   for (int i = PRI_MAX; i >= PRI_MIN; i--) {
-    if (!list_empty(&new_ready_list[i])) {
-      return list_pop_front(&new_ready_list[i]);
+    if (!list_empty(&new_ready_list.lists[i - PRI_MIN])) {
+      new_ready_list.size--;
+      return list_pop_front(&new_ready_list.lists[i - PRI_MIN]);
     }
   }
 }
 
-static struct list_elem *ready_list_begin() {
-  for (int i = PRI_MAX; i >= PRI_MIN; i--) {
-    if (!list_empty(&new_ready_list[i])) {
-      return list_begin(&new_ready_list[i]);
-    }
-  }
-}
 
-static size_t ready_list_size() {
-	size_t ret = 0;
 
-	for (int i = PRI_MAX; i >= PRI_MIN; i--) {
-		ret += list_size(&new_ready_list[i]);
-	}
-
-	return ret;
-}
 
 void
 priority_calculate (struct thread *t, void *aux)
@@ -187,11 +190,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
-
-  for (int i = PRI_MIN; i <= PRI_MAX; i++) {
-    list_init (&new_ready_list[i]);
-  }
-
+  ready_list_init();
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -514,7 +513,6 @@ thread_yield (void)
         thread_priority_compare, 
         NULL
     );
-
     ready_list_push_back(cur);
   }
   cur->status = THREAD_READY;
@@ -733,9 +731,7 @@ next_thread_to_run (void)
   if (list_empty (&ready_list)) {
     return idle_thread;
   } else {
-    // enum intr_level old_level = intr_disable ();
-    // ready_list_pop_front();
-    // intr_set_level (old_level);
+    ready_list_pop_front();
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
   }
 }
