@@ -25,7 +25,6 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list ready_list;
 static struct ready_list new_ready_list;
 
 /* List of all processes.  Processes are added to this list
@@ -174,7 +173,6 @@ thread_set_priority_mlfqs (struct thread *t, int new_priority) {
 
   t->priority = new_priority;
   t->effective_priority = new_priority;
-  list_sort(&ready_list, thread_priority_compare, NULL);
 
   if (is_interior(&t->nelem) && 
       t->status == THREAD_READY && 
@@ -212,7 +210,6 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  list_init (&ready_list);
   ready_list_init();
   list_init (&all_list);
 
@@ -265,7 +262,6 @@ size_t
 threads_ready (void)
 {
   enum intr_level old_level = intr_disable ();
-  // size_t ready_thread_count = list_size (&ready_list);
   size_t ready_thread_count = new_ready_list.size;
   intr_set_level (old_level);
   return ready_thread_count;
@@ -302,7 +298,6 @@ thread_tick (void)
     }
     
     if (timer_ticks() % TIMER_FREQ == 0) {
-      // int num_ready_threads = list_size(&ready_list);
       int num_ready_threads = ready_list_size();
       if (thread_current() != idle_thread) {
         num_ready_threads++;
@@ -452,12 +447,6 @@ thread_unblock (struct thread *t)
   if (thread_mlfqs) {
     priority_calculate(t, NULL);
   }
-  
-  list_insert_ordered(&ready_list,
-          &t->elem, 
-          thread_priority_compare, 
-          NULL
-  );
 
   ready_list_push_back(t);
 
@@ -532,12 +521,6 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) {
-    list_insert_ordered(
-        &ready_list, 
-        &cur->elem, 
-        thread_priority_compare, 
-        NULL
-    );
     ready_list_push_back(cur);
   }
   cur->status = THREAD_READY;
@@ -753,12 +736,9 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  // if (list_empty (&ready_list)) {
   if (ready_list_empty()) {
     return idle_thread;
   } else {
-    list_pop_front (&ready_list);
-    // ready_list_pop_front();
     return list_entry (ready_list_pop_front(), struct thread, nelem);
   }
 }
@@ -889,12 +869,7 @@ calculate_new_effective_priority (struct thread *t)
 void 
 preemptive_priority_check (void)
 {
-    //if (!list_empty(&ready_list)) {
     if (!ready_list_empty()) {
-        // struct thread *high = list_entry(
-        //     list_front(&ready_list), 
-        //     struct thread, elem
-        // );
         struct thread *high = list_entry(
           ready_list_front(),
           struct thread, nelem
