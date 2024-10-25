@@ -25,7 +25,7 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct ready_list ready_list;
+struct list ready_list[PRI_MAX - PRI_MIN + 1];
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -88,10 +88,8 @@ is_interior (struct list_elem *elem)
    Sets the size to 0 and initialises all interior lists. */
 static void
 ready_list_init (void) {
-  ready_list.size = 0;
-
   for (int i = PRI_MIN; i <= PRI_MAX; i++) {
-    list_init(&ready_list.lists[i - PRI_MIN]);
+    list_init(&ready_list[i - PRI_MIN]);
   }
 }
 
@@ -101,7 +99,7 @@ ready_list_size (void) {
   size_t size = 0;
 
   for (int i = PRI_MAX; i >= PRI_MIN; i--) {
-    size += list_size(&ready_list.lists[i - PRI_MIN]);
+    size += list_size(&ready_list[i - PRI_MIN]);
   }
 
   return size;
@@ -112,7 +110,7 @@ ready_list_size (void) {
 static bool
 ready_list_empty (void) {
   for (int i = PRI_MAX; i >= PRI_MIN; i--) {
-    if (!list_empty(&ready_list.lists[i - PRI_MIN])) {
+    if (!list_empty(&ready_list[i - PRI_MIN])) {
       return false;
     }
   }
@@ -124,25 +122,22 @@ ready_list_empty (void) {
    to its effective priority */
 static void 
 ready_list_push_back (struct thread *t) {
-  list_push_back(&ready_list.lists[t->effective_priority], &t->elem);
-  ready_list.size++;
+  list_push_back(&ready_list[t->effective_priority], &t->elem);
 }
 
 /* Pushes a thread to the front of the ready list corresponding
    to its effective priority */
 static void 
 ready_list_push_front (struct thread *t) {
-  list_push_front(&ready_list.lists[t->effective_priority], &t->elem);
-  ready_list.size++;
+  list_push_front(&ready_list[t->effective_priority], &t->elem);
 }
 
 /* Removes and returns the highest priority thread from the ready list */
 static struct list_elem *
 ready_list_pop_front (void) {
   for (int i = PRI_MAX; i >= PRI_MIN; i--) {
-    if (!list_empty(&ready_list.lists[i - PRI_MIN])) {
-      ready_list.size--;
-      return list_pop_front(&ready_list.lists[i - PRI_MIN]);
+    if (!list_empty(&ready_list[i - PRI_MIN])) {
+      return list_pop_front(&ready_list[i - PRI_MIN]);
     }
   }
   ASSERT(false); // If the list is empty an error should be thrown
@@ -152,8 +147,8 @@ ready_list_pop_front (void) {
 static struct list_elem *
 ready_list_front (void) {
   for (int i = PRI_MAX; i >= PRI_MIN; i--) {
-    if (!list_empty(&ready_list.lists[i - PRI_MIN])) {
-      return list_front(&ready_list.lists[i - PRI_MIN]);
+    if (!list_empty(&ready_list[i - PRI_MIN])) {
+      return list_front(&ready_list[i - PRI_MIN]);
     }
   }
   ASSERT(false); // If the list is empty an error should be thrown
