@@ -25,7 +25,7 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list ready_list;
+static struct ready_list ready_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -48,7 +48,7 @@ struct kernel_thread_frame
     void *aux;                  /* Auxiliary data for function. */
   };
 
-fixed_t load_avg;
+fixed_t load_avg;               /* Global variable for load average */
 
 /* Statistics. */
 static long long idle_ticks;    /* # of timer ticks spent idle. */
@@ -76,6 +76,89 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+/* Returns true if ELEM is an interior element,
+   false otherwise. */
+static inline bool
+is_interior (struct list_elem *elem)
+{
+  return elem != NULL && elem->prev != NULL && elem->next != NULL;
+}
+
+/* Initialises the ready list, to be called in thread_init
+   Sets the size to 0 and initialises all interior lists. */
+static void
+ready_list_init (void) {
+  ready_list.size = 0;
+
+  for (int i = PRI_MIN; i <= PRI_MAX; i++) {
+    list_init(&ready_list.lists[i - PRI_MIN]);
+  }
+}
+
+/* Returns the number of threads in the ready list */
+static size_t
+ready_list_size (void) {
+  size_t size = 0;
+
+  for (int i = PRI_MAX; i >= PRI_MIN; i--) {
+    size += list_size(&ready_list.lists[i - PRI_MIN]);
+  }
+
+  return size;
+}
+
+/* Returns true if the ready list is empty
+   false otherwise */
+static bool
+ready_list_empty (void) {
+  for (int i = PRI_MAX; i >= PRI_MIN; i--) {
+    if (!list_empty(&ready_list.lists[i - PRI_MIN])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/* Pushes a thread to the back of the ready list corresponding
+   to its effective priority */
+static void 
+ready_list_push_back (struct thread *t) {
+  list_push_back(&ready_list.lists[t->effective_priority], &t->elem);
+  ready_list.size++;
+}
+
+/* Pushes a thread to the front of the ready list corresponding
+   to its effective priority */
+static void 
+ready_list_push_front (struct thread *t) {
+  list_push_front(&ready_list.lists[t->effective_priority], &t->elem);
+  ready_list.size++;
+}
+
+/* Removes and returns the highest priority thread from the ready list */
+static struct list_elem *
+ready_list_pop_front (void) {
+  for (int i = PRI_MAX; i >= PRI_MIN; i--) {
+    if (!list_empty(&ready_list.lists[i - PRI_MIN])) {
+      ready_list.size--;
+      return list_pop_front(&ready_list.lists[i - PRI_MIN]);
+    }
+  }
+  ASSERT(false); // If the list is empty an error should be thrown
+}
+
+/* Returns the thread with the highest priority from the ready list */
+static struct list_elem *
+ready_list_front (void) {
+  for (int i = PRI_MAX; i >= PRI_MIN; i--) {
+    if (!list_empty(&ready_list.lists[i - PRI_MIN])) {
+      return list_front(&ready_list.lists[i - PRI_MIN]);
+    }
+  }
+  ASSERT(false); // If the list is empty an error should be thrown
+}
+
 void
 priority_calculate (struct thread *t, void *aux)
 {
@@ -86,21 +169,34 @@ priority_calculate (struct thread *t, void *aux)
       INT_TO_FIXED(t->niceness * 2)
     )
   );
-  int truncated_new_priority = MIN(
+  int truncated_priority = MIN(
     PRI_MAX, 
     MAX(PRI_MIN, ROUND_TO_ZERO (new_priority)));
 
-  thread_set_priority_mlfqs(t, truncated_new_priority);
+  thread_set_priority_mlfqs(t, truncated_priority);
 }
 
 void
-thread_set_priority_mlfqs (struct thread *t, int new_priority) {
+thread_set_priority_mlfqs (struct thread *t, int priority) {
 
   enum intr_level old_level = intr_disable();
 
-  t->priority = new_priority;
-  t->effective_priority = new_priority;
-  list_sort(&ready_list, thread_priority_compare, NULL);
+  int old_priority = t->effective_priority;
+
+  t->priority = priority;
+  t->effective_priority = priority;
+
+  if (is_interior(&t->elem) && 
+      t->status == THREAD_READY && 
+      old_priority != priority) {
+    if (priority > old_priority) {
+       list_remove(&t->elem);
+       ready_list_push_back(t);
+     } else if (priority < old_priority) {
+       list_remove(&t->elem);
+       ready_list_push_front(t);
+     }
+  }
 
   preemptive_priority_check();
 
@@ -126,7 +222,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  list_init (&ready_list);
+  ready_list_init();
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -177,7 +273,7 @@ size_t
 threads_ready (void)
 {
   enum intr_level old_level = intr_disable ();
-  size_t ready_thread_count = list_size (&ready_list);
+  size_t ready_thread_count = ready_list_size();
   intr_set_level (old_level);
   return ready_thread_count;
 }
@@ -213,7 +309,7 @@ thread_tick (void)
     }
     
     if (timer_ticks() % TIMER_FREQ == 0) {
-      int num_ready_threads = list_size(&ready_list);
+      int num_ready_threads = ready_list_size();
       if (thread_current() != idle_thread) {
         num_ready_threads++;
       }
@@ -362,12 +458,8 @@ thread_unblock (struct thread *t)
   if (thread_mlfqs) {
     priority_calculate(t, NULL);
   }
-  
-  list_insert_ordered(&ready_list,
-          &t->elem, 
-          thread_priority_compare, 
-          NULL
-  );
+
+  ready_list_push_back(t);
 
   t->status = THREAD_READY;
 
@@ -439,13 +531,9 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_insert_ordered(
-        &ready_list, 
-        &cur->elem, 
-        thread_priority_compare, 
-        NULL
-    );
+  if (cur != idle_thread) {
+    ready_list_push_back(cur);
+  }
   cur->status = THREAD_READY;
 
   schedule ();
@@ -471,12 +559,12 @@ thread_foreach (thread_action_func *func, void *aux)
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
-thread_set_priority (int new_priority) 
+thread_set_priority (int priority) 
 {
   struct thread *current = thread_current();
   enum intr_level old_level = intr_disable();
-  current->priority = new_priority;
-  current->effective_priority = new_priority;
+  current->priority = priority;
+  current->effective_priority = priority;
 
   if (!thread_mlfqs)
     calculate_new_effective_priority(current);
@@ -659,10 +747,11 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  if (list_empty (&ready_list))
+  if (ready_list_empty()) {
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  } else {
+    return list_entry (ready_list_pop_front(), struct thread, elem);
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -791,10 +880,10 @@ calculate_new_effective_priority (struct thread *t)
 void 
 preemptive_priority_check (void)
 {
-    if (!list_empty(&ready_list)) {
+    if (!ready_list_empty()) {
         struct thread *high = list_entry(
-            list_front(&ready_list), 
-            struct thread, elem
+          ready_list_front(),
+          struct thread, elem
         );
 
         if (high->effective_priority > thread_current()->effective_priority) {
