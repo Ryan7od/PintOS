@@ -450,10 +450,6 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
 
-  if (thread_mlfqs) {
-    priority_calculate(t, NULL);
-  }
-
   ready_list_push_back(t);
 
   t->status = THREAD_READY;
