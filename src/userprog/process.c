@@ -90,17 +90,27 @@ start_process (void *file_name_)
   }
   argv[argc] = NULL;
 
-
   success = load (argv[0], &if_.eip, &if_.esp);
+  palloc_free_page (file_name);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
-
-  /* Set up the stach using argv and argc */
-  if (!setup_stack_with_args (&if_.esp, argv, argc, max_args)) {
+  if (!success) {
+      for (int i = 0; i < argc; i++) {
+          free(argv[i]);
+      }
       thread_exit();
+  }
+
+  /* Set up the stack using argv and argc and quit if failed */
+  if (!setup_stack_with_args (&if_.esp, argv, argc, max_args)) {
+      for (int i = 0; i < argc; i++) {
+          free(argv[i]);
+      }
+      thread_exit();
+  }
+
+  for (int i = 0; i < argc; i++) {
+      free(argv[i]);
   }
 
   /* Start the user process by simulating a return from an
