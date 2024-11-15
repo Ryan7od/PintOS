@@ -53,6 +53,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       get_args(f, args, 3);
       validate_buffer((const void*)args[1], args[2]);
       f->eax = sys_write(args[0], (const void *)args[1], args[2]);
+      break;
 
     // case 
 
