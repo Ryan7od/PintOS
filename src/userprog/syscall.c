@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "devices/shutdown.h"
+#include "lib/kernel/console.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -14,11 +15,12 @@ static bool put_user (uint8_t *udst, uint8_t byte) UNUSED;
 
 static void get_args (struct intr_frame *f, int *args, int num_args);
 static void validate_buffer(const void *buffer, unsigned size);
+static void validate_user_pointer(const void *ptr);
 
 /* System call functions */
 static void sys_halt(void);
 static void sys_exit(int status);
-// static int sys_write(int fd, const void *buffer, unsigned size);
+static int sys_write(int fd, const void *buffer, unsigned size);
 
 void
 syscall_init (void) 
@@ -47,10 +49,10 @@ syscall_handler (struct intr_frame *f UNUSED)
       sys_exit(args[0]);
       break;
 
-    // case SYS_WRITE:
-    //   get_args(f, args, 3);
-    //   validate_buffer((const void*)args[1], args[2]);
-    //   f->eax = write(args[0], (const void *)args[1], args[2]);
+    case SYS_WRITE:
+      get_args(f, args, 3);
+      validate_buffer((const void*)args[1], args[2]);
+      f->eax = sys_write(args[0], (const void *)args[1], args[2]);
 
     // case 
 
@@ -77,30 +79,60 @@ get_args (struct intr_frame *f, int *args, int num_args)
 }
 
 static void
-validate_buffer(const void *buffer, unsigned size)
+validate_buffer (const void *buffer, unsigned size)
 {
   char *buf = (char *)buffer;
   for (unsigned i = 0; i < size; i++)
   {
-    if (!is_user_vaddr(buf + i) || 
-    pagedir_get_page(thread_current()->pagedir, buf + i) == NULL)
-      sys_exit(-1);
+    validate_user_pointer ((const void *)(buf + i));
   }
 }
+
+static void 
+validate_user_pointer (const void *ptr) 
+{
+  if (ptr == NULL || !is_user_vaddr(ptr) || 
+  pagedir_get_page(thread_current()->pagedir, ptr) == NULL) 
+  {
+    sys_exit (-1);
+  }
+} 
 
 static void
 sys_halt (void)
 {
-  shutdown_power_off();
+  shutdown_power_off ();
 }
 
 static void
 sys_exit (int status)
 {
-  struct thread *cur = thread_current();
+  struct thread *cur = thread_current ();
   cur->exit_status = status;
   printf("%s: exit(%d)\n", cur->name, status);
-  thread_exit();
+  thread_exit ();
+}
+
+static int
+sys_write (int fd, const void *buffer, unsigned size)
+{
+  int bytes_written;
+
+  validate_buffer (buffer, size);
+
+  if (fd == STDOUT_FILENO) // case for writing to console when fd 1
+  {
+    putbuf (buffer, size);
+    return size;
+  } 
+  else if (fd == STDIN_FILENO)
+  {
+    return -1; // case for writing to standard input will cause error
+  }
+  // else
+  // {
+  //   // case for writing to a file
+  // }
 }
 
 /* Reads a byte at user virtual address UADDR.
