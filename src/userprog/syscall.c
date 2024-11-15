@@ -16,10 +16,12 @@ static bool put_user (uint8_t *udst, uint8_t byte) UNUSED;
 static void get_args (struct intr_frame *f, int *args, int num_args);
 static void validate_buffer(const void *buffer, unsigned size);
 static void validate_user_pointer(const void *ptr);
+static void validate_string(const char *str);
 
 /* System call functions */
 static void sys_halt(void);
 static void sys_exit(int status);
+static pid_t sys_exec(const char *cmd_line);
 static int sys_wait(pid_t pid);
 static int sys_write(int fd, const void *buffer, unsigned size);
 
@@ -48,6 +50,12 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_EXIT:
       get_args(f, &args[0], 1);
       sys_exit(args[0]);
+      break;
+    
+    case SYS_EXEC:
+      get_args(f, &args[0], 1);
+      validate_string((const char *)args[0]);
+      f->eax = sys_exec((const char *)args[0]);
       break;
 
     case SYS_WAIT:
@@ -79,8 +87,7 @@ get_args (struct intr_frame *f, int *args, int num_args)
   for (int i = 0; i < num_args; i++)
   {
     ptr = (int *)f->esp + i + 1; // +1 to skip syscall_number
-    if (!is_user_vaddr(ptr))
-      sys_exit(-1);
+    validate_user_pointer((const void *)ptr);
     args[i] = *ptr;
   }
 }
@@ -106,6 +113,18 @@ validate_user_pointer (const void *ptr)
 } 
 
 static void
+validate_string(const char *str)
+{
+  while (true)
+    {
+      validate_user_pointer((const void *)str);
+      if (*str == '\0')
+      break;
+      str++;
+    }
+}
+
+static void
 sys_halt (void)
 {
   shutdown_power_off ();
@@ -120,10 +139,17 @@ sys_exit (int status)
   thread_exit ();
 }
 
+static pid_t
+sys_exec(const char *cmd_line)
+{
+  validate_string (cmd_line);
+  return process_execute (cmd_line);
+}
+
 static int 
 sys_wait (pid_t pid) 
 {
-  return process_wait(pid);
+  return process_wait (pid);
 }
 
 static int
