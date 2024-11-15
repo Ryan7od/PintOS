@@ -119,7 +119,60 @@ start_process (void *file_name_)
  * then argc, then a fake return address of 0 */
 static bool
 setup_stack_with_args (void **esp, char **argv, int argc, int max_args) {
+    /* Set up an array with pointers to the arguments on the stack */
+    char *arg_addresses[max_args];
+    /* Put arguments directly onto stack in reverse order */
+    for (int i = argc - 1; i >= 0; i--) {
+        if (stack_overflow (*esp, strlen(argv[i]) + 1)) return false;
+        *esp -= strlen(argv[i]) + 1;
+        memcpy (*esp, argv[i], strlen(argv[i]) + 1);
+        arg_addresses[i] = *esp;
+    }
+
+    /* Word align the stack */
+    uintptr_t diff = (uintptr_t)*esp % 4;
+    if (diff != 0) {
+        if (stack_overflow (*esp, (size_t)diff)) return false;
+        *esp -= diff;
+        memset (*esp, 0, diff);
+    }
+
+    /* Push null pointer */
+    if (stack_overflow (*esp, sizeof (char *))) return false;
+    *esp -= sizeof (char *);
+    *(char **)*esp = NULL;
+
+    /* Push argument adresses */
+    for (int i = argc - 1; i >= 0; i--) {
+        if (stack_overflow (*esp, sizeof (char *))) return false;
+        *esp -= sizeof (char *);
+        memcpy (*esp, &arg_addresses[i], sizeof (char *));
+    }
+
+    /* Push pointer to first element of arg_addresses */
+    char **argv_ptr = *esp;
+    if (stack_overflow (*esp, sizeof (char **))) return false;
+    *esp -= sizeof(char **);
+    memcpy (*esp, &argv_ptr, sizeof(char **));
+
+    /* Push argc */
+    if (stack_overflow (*esp, sizeof (int))) return false;
+    *esp -= sizeof(int);
+    *(int *)*esp = argc;
+
+    /* Push a fake return address */
+    if (stack_overflow (*esp, sizeof (void *))) return false;
+    *esp -= sizeof(void *);
+    *(void **)*esp = 0;
+
     return true;
+}
+
+/* Function that checks if the stack has gone into stack overflow (used too
+ * much space) and if so returns false and so exits the thread */
+static bool
+stack_overflow (void *esp, size_t size) {
+    return (uintptr_t)esp - size < (uintptr_t)(PHYS_BASE - PGSIZE);
 }
 
 /* Waits for thread TID to die and returns its exit status. 
