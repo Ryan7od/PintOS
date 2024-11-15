@@ -20,6 +20,8 @@
 #include "devices/timer.h"
 
 static thread_func start_process NO_RETURN;
+static bool setup_stack_with_args (void **esp, char *argv[], int argc, int max_args);
+static bool stack_overflow(void *esp, size_t size);
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 /* Starts a new thread running a user program loaded from
@@ -60,12 +62,46 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+
+  /* Parse the filename into argv */
+  int max_args = 32;
+  char *argv[max_args];
+  int argc = 0;
+
+  /* Use strtok_r to go through file_name */
+  char *token, *token_ptr;
+  token = strtok_r (file_name, " ", &token_ptr);
+  // Handling multiple spaces
+  while (token != NULL && strcmp(token, "") == 0) {
+      token = strtok_r (NULL, " ", &token_ptr);
+  }
+  // Assigning to argv
+  while (token != NULL && argc < max_args) {
+      argv[argc] = malloc(strlen(token) + 1);
+      if (argv[argc] == NULL) {
+          thread_exit();
+      }
+      strlcpy(argv[argc], token, strlen(token) + 1);
+      argc++;
+      token = strtok_r (NULL, " ", &token_ptr);
+      while (token != NULL && strcmp(token, "") == 0) {
+          token = strtok_r (NULL, " ", &token_ptr);
+      }
+  }
+  argv[argc] = NULL;
+
+
+  success = load (argv[0], &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
     thread_exit ();
+
+  /* Set up the stach using argv and argc */
+  if (!setup_stack_with_args (&if_.esp, argv, argc, max_args)) {
+      thread_exit();
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -75,6 +111,15 @@ start_process (void *file_name_)
      and jump to it. */
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
+}
+
+/* A helper function for start_process that takes argv, argc and the pointer
+ * to the stack and sets up the stack, with argv inserted in reverse order,
+ * followed by word aligning it, then a null sentinel, then a pointer to argv,
+ * then argc, then a fake return address of 0 */
+static bool
+setup_stack_with_args (void **esp, char **argv, int argc, int max_args) {
+    return true;
 }
 
 /* Waits for thread TID to die and returns its exit status. 
@@ -445,8 +490,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-  esp = PHYS_BASE - 12;
-
   uint8_t *kpage;
   bool success = false;
 
