@@ -26,6 +26,7 @@ static void sys_exit(int status);
 static pid_t sys_exec(const char *cmd_line);
 static int sys_wait(pid_t pid);
 static bool sys_create(const char *file, unsigned initial_size);
+static bool sys_remove (const char *file);
 static int sys_write(int fd, const void *buffer, unsigned size);
 
 static struct lock filesys_lock;
@@ -73,6 +74,12 @@ syscall_handler (struct intr_frame *f UNUSED)
       get_args(f, &args[0], 2);
       validate_string((const char *)args[0]);
       f->eax = sys_create((const char *)args[0], (unsigned)args[1]);
+      break;
+    
+    case SYS_REMOVE:
+      get_args(f, &args[0], 1);
+      validate_string((const char *)args[0]);
+      f->eax = sys_remove((const char *)args[0]);
       break;
 
     case SYS_WRITE:
@@ -171,6 +178,18 @@ sys_create (const char *file, unsigned initial_size)
 
   lock_acquire(&filesys_lock);
   success = filesys_create(file, initial_size);
+  lock_release(&filesys_lock);
+
+  return success;
+}
+
+static bool
+sys_remove(const char *file)
+{
+  bool success;
+  
+  lock_acquire(&filesys_lock);
+  success = filesys_remove(file);
   lock_release(&filesys_lock);
 
   return success;
