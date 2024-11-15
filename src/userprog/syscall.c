@@ -13,6 +13,7 @@ static bool put_user (uint8_t *udst, uint8_t byte) UNUSED;
 static void get_args (struct intr_frame *f, int *args, int num_args);
 
 /* System call functions */
+static void sys_halt(void);
 static void sys_exit(int status);
 
 void
@@ -33,6 +34,10 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   switch (syscall_number)
   {
+    case SYS_HALT:
+      sys_halt();
+      break;
+
     case SYS_EXIT:
       get_args(f, &args[0], 1);
       sys_exit(args[0]);
@@ -60,6 +65,12 @@ get_args (struct intr_frame *f, int *args, int num_args)
       sys_exit(-1);
     args[i] = *ptr;
   }
+}
+
+static void
+sys_halt (void)
+{
+  shutdown_power_off();
 }
 
 static void
