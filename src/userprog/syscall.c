@@ -1,9 +1,11 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include "devices/shutdown.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/process.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -11,10 +13,12 @@ static int get_user(const uint8_t *uaddr);
 static bool put_user (uint8_t *udst, uint8_t byte) UNUSED;
 
 static void get_args (struct intr_frame *f, int *args, int num_args);
+static void validate_buffer(const void *buffer, unsigned size);
 
 /* System call functions */
 static void sys_halt(void);
 static void sys_exit(int status);
+// static int sys_write(int fd, const void *buffer, unsigned size);
 
 void
 syscall_init (void) 
@@ -43,6 +47,11 @@ syscall_handler (struct intr_frame *f UNUSED)
       sys_exit(args[0]);
       break;
 
+    // case SYS_WRITE:
+    //   get_args(f, args, 3);
+    //   validate_buffer((const void*)args[1], args[2]);
+    //   f->eax = write(args[0], (const void *)args[1], args[2]);
+
     // case 
 
     default:
@@ -64,6 +73,18 @@ get_args (struct intr_frame *f, int *args, int num_args)
     if (!is_user_vaddr(ptr))
       sys_exit(-1);
     args[i] = *ptr;
+  }
+}
+
+static void
+validate_buffer(const void *buffer, unsigned size)
+{
+  char *buf = (char *)buffer;
+  for (unsigned i = 0; i < size; i++)
+  {
+    if (!is_user_vaddr(buf + i) || 
+    pagedir_get_page(thread_current()->pagedir, buf + i) == NULL)
+      sys_exit(-1);
   }
 }
 
