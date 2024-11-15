@@ -105,6 +105,7 @@ struct thread
     int niceness;                       /* Niceness. */
     fixed_t recent_cpu;                 /* Recent CPU. */
     int effective_priority;
+    int exit_status;
 
     struct list_elem allelem;           /* List element for all threads 
                                            list. */
