@@ -7,6 +7,8 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/process.h"
+#include "userprog/pagedir.h"
+#include "filesys/filesys.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -23,11 +25,15 @@ static void sys_halt(void);
 static void sys_exit(int status);
 static pid_t sys_exec(const char *cmd_line);
 static int sys_wait(pid_t pid);
+static bool sys_create(const char *file, unsigned initial_size);
 static int sys_write(int fd, const void *buffer, unsigned size);
+
+static struct lock filesys_lock;
 
 void
 syscall_init (void) 
 {
+  lock_init(&filesys_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -61,6 +67,12 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_WAIT:
       get_args(f, &args[0], 1);
       f->eax = sys_wait(args[0]);
+      break;
+
+    case SYS_CREATE:
+      get_args(f, &args[0], 2);
+      validate_string((const char *)args[0]);
+      f->eax = sys_create((const char *)args[0], (unsigned)args[1]);
       break;
 
     case SYS_WRITE:
@@ -150,6 +162,18 @@ static int
 sys_wait (pid_t pid) 
 {
   return process_wait (pid);
+}
+
+static bool
+sys_create (const char *file, unsigned initial_size)
+{
+  bool success;
+
+  lock_acquire(&filesys_lock);
+  success = filesys_create(file, initial_size);
+  lock_release(&filesys_lock);
+
+  return success;
 }
 
 static int
