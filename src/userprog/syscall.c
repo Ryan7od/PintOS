@@ -20,6 +20,7 @@ static void validate_user_pointer(const void *ptr);
 /* System call functions */
 static void sys_halt(void);
 static void sys_exit(int status);
+static int sys_wait(pid_t pid);
 static int sys_write(int fd, const void *buffer, unsigned size);
 
 void
@@ -47,6 +48,11 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_EXIT:
       get_args(f, &args[0], 1);
       sys_exit(args[0]);
+      break;
+
+    case SYS_WAIT:
+      get_args(f, &args[0], 1);
+      f->eax = sys_wait(args[0]);
       break;
 
     case SYS_WRITE:
@@ -112,6 +118,12 @@ sys_exit (int status)
   cur->exit_status = status;
   printf("%s: exit(%d)\n", cur->name, status);
   thread_exit ();
+}
+
+static int 
+sys_wait (pid_t pid) 
+{
+  return process_wait(pid);
 }
 
 static int

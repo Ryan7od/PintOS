@@ -8,4 +8,7 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (void);
 
+/* Process ID type */
+typedef int pid_t;
+
 #endif /* userprog/process.h */
