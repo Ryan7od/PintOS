@@ -133,19 +133,15 @@ timer_sleep (int64_t ticks)
     if (ticks <= 0) return;
 
     /* Define and intialise sleeping thread */
-    struct sleepingThread *t = malloc(sizeof(struct sleepingThread));
-    t->wakeTime = timer_ticks() + ticks;
-    sema_init(&t->sleepSema, 0);
+    struct sleepingThread t;
+    t.wakeTime = timer_ticks() + ticks;
+    sema_init(&t.sleepSema, 0);
 
     /* Put to sleep */
     enum intr_level oldIntrLevel = intr_disable();
-    sleepListAddElement(t);
+    sleepListAddElement(&t);
     intr_set_level(oldIntrLevel);
-    sema_down(&t->sleepSema);
-
-    /* Awake */
-
-    free(t);
+    sema_down(&t.sleepSema);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
