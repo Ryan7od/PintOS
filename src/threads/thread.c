@@ -324,6 +324,8 @@ thread_tick (void)
     if (thread_ticks % TIME_SLICE == 0) {
       priority_calculate(thread_current(), NULL);
     }
+  } else {
+      preemptive_priority_check();
   }
   
   /* Update statistics. */
@@ -441,7 +443,7 @@ thread_block (void)
    it may expect that it can atomically unblock a thread and
    update other data. */
 void
-thread_unblock (struct thread *t) 
+thread_unblock (struct thread *t)
 {
   enum intr_level old_level;
 
@@ -449,10 +451,6 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-
-  if (thread_mlfqs) {
-    priority_calculate(t, NULL);
-  }
 
   ready_list_push_back(t);
 

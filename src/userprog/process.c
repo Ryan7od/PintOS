@@ -17,8 +17,11 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "devices/timer.h"
 
 static thread_func start_process NO_RETURN;
+static bool setup_stack_with_args (void **esp, char *argv[], int argc, int max_args);
+static bool stack_overflow(void *esp, size_t size);
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 /* Starts a new thread running a user program loaded from
@@ -59,12 +62,56 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+
+  /* Parse the filename into argv */
+  int max_args = 32;
+  char *argv[max_args];
+  int argc = 0;
+
+  /* Use strtok_r to go through file_name */
+  char *token, *token_ptr;
+  token = strtok_r (file_name, " ", &token_ptr);
+  // Handling multiple spaces
+  while (token != NULL && strcmp(token, "") == 0) {
+      token = strtok_r (NULL, " ", &token_ptr);
+  }
+  // Assigning to argv
+  while (token != NULL && argc < max_args) {
+      argv[argc] = malloc(strlen(token) + 1);
+      if (argv[argc] == NULL) {
+          thread_exit();
+      }
+      strlcpy(argv[argc], token, strlen(token) + 1);
+      argc++;
+      token = strtok_r (NULL, " ", &token_ptr);
+      while (token != NULL && strcmp(token, "") == 0) {
+          token = strtok_r (NULL, " ", &token_ptr);
+      }
+  }
+  argv[argc] = NULL;
+
+  success = load (argv[0], &if_.eip, &if_.esp);
+  palloc_free_page (file_name);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+  if (!success) {
+      for (int i = 0; i < argc; i++) {
+          free(argv[i]);
+      }
+      thread_exit();
+  }
+
+  /* Set up the stack using argv and argc and quit if failed */
+  if (!setup_stack_with_args (&if_.esp, argv, argc, max_args)) {
+      for (int i = 0; i < argc; i++) {
+          free(argv[i]);
+      }
+      thread_exit();
+  }
+
+  for (int i = 0; i < argc; i++) {
+      free(argv[i]);
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -74,6 +121,68 @@ start_process (void *file_name_)
      and jump to it. */
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
+}
+
+/* A helper function for start_process that takes argv, argc and the pointer
+ * to the stack and sets up the stack, with argv inserted in reverse order,
+ * followed by word aligning it, then a null sentinel, then a pointer to argv,
+ * then argc, then a fake return address of 0 */
+static bool
+setup_stack_with_args (void **esp, char **argv, int argc, int max_args) {
+    /* Set up an array with pointers to the arguments on the stack */
+    char *arg_addresses[max_args];
+    /* Put arguments directly onto stack in reverse order */
+    for (int i = argc - 1; i >= 0; i--) {
+        if (stack_overflow (*esp, strlen(argv[i]) + 1)) return false;
+        *esp -= strlen(argv[i]) + 1;
+        memcpy (*esp, argv[i], strlen(argv[i]) + 1);
+        arg_addresses[i] = *esp;
+    }
+
+    /* Word align the stack */
+    uintptr_t diff = (uintptr_t)*esp % 4;
+    if (diff != 0) {
+        if (stack_overflow (*esp, (size_t)diff)) return false;
+        *esp -= diff;
+        memset (*esp, 0, diff);
+    }
+
+    /* Push null pointer */
+    if (stack_overflow (*esp, sizeof (char *))) return false;
+    *esp -= sizeof (char *);
+    *(char **)*esp = NULL;
+
+    /* Push argument adresses */
+    for (int i = argc - 1; i >= 0; i--) {
+        if (stack_overflow (*esp, sizeof (char *))) return false;
+        *esp -= sizeof (char *);
+        memcpy (*esp, &arg_addresses[i], sizeof (char *));
+    }
+
+    /* Push pointer to first element of arg_addresses */
+    char **argv_ptr = *esp;
+    if (stack_overflow (*esp, sizeof (char **))) return false;
+    *esp -= sizeof(char **);
+    memcpy (*esp, &argv_ptr, sizeof(char **));
+
+    /* Push argc */
+    if (stack_overflow (*esp, sizeof (int))) return false;
+    *esp -= sizeof(int);
+    *(int *)*esp = argc;
+
+    /* Push a fake return address */
+    if (stack_overflow (*esp, sizeof (void *))) return false;
+    *esp -= sizeof(void *);
+    *(void **)*esp = 0;
+
+    return true;
+}
+
+/* Function that checks if the stack has gone into stack overflow (used too
+ * much space) and if so returns false and so exits the thread */
+static bool
+stack_overflow (void *esp, size_t size) {
+    return (uintptr_t)esp - size < (uintptr_t)(PHYS_BASE - PGSIZE);
 }
 
 /* Waits for thread TID to die and returns its exit status. 
@@ -88,6 +197,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  timer_sleep(1000000);
   return -1;
 }
 
