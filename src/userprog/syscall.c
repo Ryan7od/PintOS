@@ -275,7 +275,7 @@ static int
 sys_write (int fd, const void *buffer, unsigned size)
 {
   struct file_descriptor *fd_elem;
-  int bytes_written;
+  int bytes_written = -1;
 
   validate_buffer (buffer, size);
 
