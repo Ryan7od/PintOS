@@ -274,6 +274,7 @@ sys_read(int fd, void *buffer, unsigned size)
 static int
 sys_write (int fd, const void *buffer, unsigned size)
 {
+  struct file_descriptor *fd_elem;
   int bytes_written;
 
   validate_buffer (buffer, size);
@@ -287,10 +288,19 @@ sys_write (int fd, const void *buffer, unsigned size)
   {
     return -1; // case for writing to standard input will cause error
   }
-  // else
-  // {
-  //   // case for writing to a file
-  // }
+  else
+  {
+    lock_acquire(&filesys_lock);
+    fd_elem = get_file_descriptor(fd);
+
+    if (fd_elem != NULL && fd_elem->file != NULL)
+    {
+      bytes_written = file_write(fd_elem->file, buffer, size);
+    }
+
+    lock_release(&filesys_lock);
+    return bytes_written;
+  }
 }
 
 // retrieves the file descriptor structure associated with fd in the current process
