@@ -1,6 +1,15 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 
+#include <list.h>
+
+/* Data structure for file descriptor */
+struct file_descriptor {
+  int fd;                     /* File descriptor number */
+  struct file *file;          /* Pointer to the file structure */
+  struct list_elem elem;      /* List element for inclusion in a list */
+};
+
 void syscall_init (void);
 
 #endif /* userprog/syscall.h */
