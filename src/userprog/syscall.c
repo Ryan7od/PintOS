@@ -2,12 +2,13 @@
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "devices/shutdown.h"
+#include "devices/input.h"
 #include "lib/kernel/console.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "userprog/process.h"
 #include "userprog/pagedir.h"
+#include "userprog/process.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 
@@ -30,6 +31,7 @@ static int sys_wait(pid_t pid);
 static bool sys_create(const char *file, unsigned initial_size);
 static bool sys_remove (const char *file);
 static int sys_filesize (int fd);
+static int sys_read(int fd, void *buffer, unsigned size);
 static int sys_write(int fd, const void *buffer, unsigned size);
 
 static struct lock filesys_lock;
@@ -94,7 +96,11 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = sys_filesize(args[0]);
       break;
 
-    // read
+    case SYS_READ:
+      get_args(f, &args[0], 3);
+      validate_buffer((void *)args[1], args[2]);
+      f->eax = sys_read(args[0], (void *)args[1], args[2]);
+      break;
 
     case SYS_WRITE:
       get_args(f, args, 3);
@@ -224,7 +230,45 @@ sys_filesize(int fd)
     size = file_length(fd_elem->file);
   }
   lock_release(&filesys_lock);
+
   return size;
+}
+
+static int
+sys_read(int fd, void *buffer, unsigned size)
+{
+  struct file_descriptor *fd_elem;
+  int bytes_read = -1;
+
+  validate_buffer(buffer, size);
+
+  if (fd == STDIN_FILENO)
+  {
+    // keyboard
+    uint8_t *buf = (uint8_t *)buffer;
+    for (unsigned i = 0; i < size; i++)
+    {
+      buf[i] = input_getc();
+    }
+    return size;
+  }
+  else if (fd == STDOUT_FILENO)
+  {
+    return -1;
+  }
+  else
+  {
+    lock_acquire(&filesys_lock);
+    fd_elem = get_file_descriptor(fd);
+
+    if (fd_elem != NULL && fd_elem->file != NULL)
+    {
+      bytes_read = file_read(fd_elem->file, buffer, size);
+    }
+
+    lock_release(&filesys_lock);
+    return bytes_read;
+  }
 }
 
 static int
