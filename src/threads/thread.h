@@ -120,6 +120,8 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct list fd_list;  /* List of open file descriptors */
+    int next_fd;          /* Next file descriptor number to assign */
 #endif
 
     /* Owned by thread.c. */
