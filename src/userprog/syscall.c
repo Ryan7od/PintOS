@@ -9,6 +9,7 @@
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
 #include "filesys/filesys.h"
+#include "filesys/file.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -19,6 +20,7 @@ static void get_args (struct intr_frame *f, int *args, int num_args);
 static void validate_buffer(const void *buffer, unsigned size);
 static void validate_user_pointer(const void *ptr);
 static void validate_string(const char *str);
+static struct file_descriptor *get_file_descriptor(int fd);
 
 /* System call functions */
 static void sys_halt(void);
@@ -27,6 +29,7 @@ static pid_t sys_exec(const char *cmd_line);
 static int sys_wait(pid_t pid);
 static bool sys_create(const char *file, unsigned initial_size);
 static bool sys_remove (const char *file);
+static int sys_filesize (int fd);
 static int sys_write(int fd, const void *buffer, unsigned size);
 
 static struct lock filesys_lock;
@@ -47,6 +50,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     sys_exit(-1); // terminate if process is invalid
   
   syscall_number = *(int *)f->esp;
+
+  printf ("system call!\n");
 
   switch (syscall_number)
   {
@@ -81,6 +86,15 @@ syscall_handler (struct intr_frame *f UNUSED)
       validate_string((const char *)args[0]);
       f->eax = sys_remove((const char *)args[0]);
       break;
+
+    // open
+
+    case SYS_FILESIZE:
+      get_args(f, &args[0], 1);
+      f->eax = sys_filesize(args[0]);
+      break;
+
+    // read
 
     case SYS_WRITE:
       get_args(f, args, 3);
@@ -195,6 +209,24 @@ sys_remove(const char *file)
   return success;
 }
 
+// open
+
+static int
+sys_filesize(int fd)
+{
+  struct file_descriptor *fd_elem;
+  int size = -1;
+
+  lock_acquire(&filesys_lock);
+  fd_elem = get_file_descriptor(fd);
+  if (fd_elem != NULL && fd_elem->file != NULL)
+  {
+    size = file_length(fd_elem->file);
+  }
+  lock_release(&filesys_lock);
+  return size;
+}
+
 static int
 sys_write (int fd, const void *buffer, unsigned size)
 {
@@ -215,6 +247,24 @@ sys_write (int fd, const void *buffer, unsigned size)
   // {
   //   // case for writing to a file
   // }
+}
+
+// retrieves the file descriptor structure associated with fd in the current process
+static struct file_descriptor *
+get_file_descriptor(int fd)
+{
+  struct thread *t = thread_current();
+  struct list_elem *e;
+
+  for (e = list_begin(&t->fd_list); e != list_end(&t->fd_list); e = list_next(e))
+  {
+    struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
+    if (fd_elem->fd == fd)
+    {
+      return fd_elem;
+    }
+  }
+  return NULL;  // file descriptor not found 
 }
 
 /* Reads a byte at user virtual address UADDR.
