@@ -166,8 +166,7 @@ validate_buffer (const void *buffer, unsigned size)
 static void 
 validate_user_pointer (const void *ptr) 
 {
-  if (ptr == NULL || !is_user_vaddr(ptr) || 
-  pagedir_get_page(thread_current()->pagedir, ptr) == NULL) 
+  if (get_user((const uint8_t *)ptr) == -1)
   {
     sys_exit (-1);
   }
@@ -273,7 +272,7 @@ sys_open(const char *file)
 
   fd_elem->fd = cur->next_fd++;
   fd_elem->file = f;
-  
+
   list_push_back(&cur->fd_list, &fd_elem->elem);
 
   fd = fd_elem->fd;
