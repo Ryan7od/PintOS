@@ -35,7 +35,7 @@ static bool sys_remove (const char *file);
 static int sys_filesize (int fd);
 static int sys_read(int fd, void *buffer, unsigned size);
 static int sys_write(int fd, const void *buffer, unsigned size);
-//seek
+static void sys_seek(int fd, unsigned position);
 //tell
 static void sys_close(int fd);
 
@@ -113,9 +113,12 @@ syscall_handler (struct intr_frame *f)
       f->eax = sys_write(args[0], (const void *)args[1], args[2]);
       break;
 
-      //seek
+    case SYS_SEEK:
+      get_args(f, &args[0], 2);
+      sys_seek(args[0], (unsigned)args[1]);
+      break;
 
-      //tell
+    //tell
 
     case SYS_CLOSE:
       get_args(f, &args[0], 1);
@@ -314,6 +317,22 @@ sys_write (int fd, const void *buffer, unsigned size)
     lock_release(&filesys_lock);
     return bytes_written;
   }
+}
+
+static void
+sys_seek(int fd, unsigned position)
+{
+  struct file_descriptor *fd_elem;
+
+  lock_acquire(&filesys_lock);
+  fd_elem = get_file_descriptor(fd);
+
+  if (fd_elem != NULL && fd_elem->file != NULL)
+  {
+    file_seek(fd_elem->file, position);
+  }
+
+  lock_release(&filesys_lock);
 }
 
 static void
