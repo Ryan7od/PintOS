@@ -698,6 +698,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->effective_priority = priority;
   t->magic = THREAD_MAGIC;
+  list_init(&t->fd_list);
+  t->next_fd = 2;
   
   if (thread_mlfqs) {
     if (strcmp(name, "main") == 0) {
