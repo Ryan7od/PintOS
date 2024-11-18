@@ -342,7 +342,7 @@ static unsigned
 sys_tell(int fd)
 {
   struct file_descriptor *fd_elem;
-  unsigned position = 0;
+  unsigned position = (unsigned) -1;
 
   lock_acquire(&filesys_lock);
   fd_elem = get_file_descriptor(fd);
