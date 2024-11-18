@@ -7,6 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
 #include "filesys/filesys.h"
@@ -30,9 +31,13 @@ static pid_t sys_exec(const char *cmd_line);
 static int sys_wait(pid_t pid);
 static bool sys_create(const char *file, unsigned initial_size);
 static bool sys_remove (const char *file);
+//open
 static int sys_filesize (int fd);
 static int sys_read(int fd, void *buffer, unsigned size);
 static int sys_write(int fd, const void *buffer, unsigned size);
+//seek
+//tell
+static void sys_close(int fd);
 
 static struct lock filesys_lock;
 
@@ -44,7 +49,7 @@ syscall_init (void)
 }
 
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f) 
 {
   int syscall_number;
   int args[3];
@@ -108,7 +113,14 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = sys_write(args[0], (const void *)args[1], args[2]);
       break;
 
-    // case 
+      //seek
+
+      //tell
+
+    case SYS_CLOSE:
+      get_args(f, &args[0], 1);
+      sys_close(args[0]);
+      break;
 
     default:
       printf("Unknown system call: %d\n", syscall_number);
@@ -166,6 +178,7 @@ validate_string(const char *str)
 static void
 sys_halt (void)
 {
+  printf("halt");
   shutdown_power_off ();
 }
 
@@ -302,6 +315,25 @@ sys_write (int fd, const void *buffer, unsigned size)
     return bytes_written;
   }
 }
+
+static void
+sys_close(int fd)
+{
+  struct file_descriptor *fd_elem;
+
+  lock_acquire(&filesys_lock);
+  fd_elem = get_file_descriptor(fd);
+
+  if (fd_elem != NULL)
+  {
+    file_close(fd_elem->file);
+    list_remove(&fd_elem->elem);
+    free(fd_elem); //assuming malloc in open
+  }
+
+  lock_release(&filesys_lock);
+}
+
 
 // retrieves the file descriptor structure associated with fd in the current process
 static struct file_descriptor *
