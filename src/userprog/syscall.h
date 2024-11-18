@@ -3,6 +3,8 @@
 
 #include <list.h>
 
+#define MAX_OPEN_FILES 128
+
 /* Data structure for file descriptor */
 struct file_descriptor {
   int fd;                     /* File descriptor number */

@@ -31,7 +31,7 @@ static pid_t sys_exec(const char *cmd_line);
 static int sys_wait(pid_t pid);
 static bool sys_create(const char *file, unsigned initial_size);
 static bool sys_remove (const char *file);
-//open
+static int sys_open(const char *file);
 static int sys_filesize (int fd);
 static int sys_read(int fd, void *buffer, unsigned size);
 static int sys_write(int fd, const void *buffer, unsigned size);
@@ -94,7 +94,11 @@ syscall_handler (struct intr_frame *f)
       f->eax = sys_remove((const char *)args[0]);
       break;
 
-    // open
+    case SYS_OPEN:
+      get_args(f, &args[0], 1);
+      validate_string((const char *)args[0]);
+      f->eax = sys_open((const char *)args[0]);
+      break;
 
     case SYS_FILESIZE:
       get_args(f, &args[0], 1);
@@ -234,7 +238,50 @@ sys_remove(const char *file)
   return success;
 }
 
-// open
+static int
+sys_open(const char *file)
+{
+  struct file *f;
+  int fd = -1;
+  struct thread *cur = thread_current();
+  struct file_descriptor *fd_elem;
+
+  validate_string(file);
+
+  lock_acquire(&filesys_lock);
+  if(list_size(&cur->fd_list) >= MAX_OPEN_FILES) 
+  {
+    lock_release(&filesys_lock);
+    return -1;
+  }
+
+  f = filesys_open(file);
+
+  if (f == NULL)
+  {
+    lock_release(&filesys_lock);
+    return -1;
+  }
+
+  fd_elem = malloc(sizeof(struct file_descriptor));
+  if (fd_elem == NULL)
+  {
+    file_close(f);
+    lock_release(&filesys_lock);
+    return -1;
+  }
+
+  fd_elem->fd = cur->next_fd++;
+  fd_elem->file = f;
+  
+  list_push_back(&cur->fd_list, &fd_elem->elem);
+
+  fd = fd_elem->fd;
+
+  lock_release(&filesys_lock);
+
+  return fd;
+}
 
 static int
 sys_filesize(int fd)
