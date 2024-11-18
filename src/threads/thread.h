@@ -105,7 +105,6 @@ struct thread
     int niceness;                       /* Niceness. */
     fixed_t recent_cpu;                 /* Recent CPU. */
     int effective_priority;
-    int exit_status;
 
     struct list_elem allelem;           /* List element for all threads 
                                            list. */
@@ -119,6 +118,7 @@ struct thread
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
+    int exit_status;
     uint32_t *pagedir;                  /* Page directory. */
     struct list fd_list;  /* List of open file descriptors */
     int next_fd;          /* Next file descriptor number to assign */
