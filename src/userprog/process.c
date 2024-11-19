@@ -48,6 +48,10 @@ process_execute (const char *file_name)
   childProcess.parent = thread_current();
   childProcess.parent_alive = true;
   
+  lock_acquire(&thread_current()->child_list_lock);
+  list_push_back(&thread_current()->child_list, &childProcess.elem);
+  lock_release(&thread_current()->child_list_lock);
+  
   return tid;
 }
 
