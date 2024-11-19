@@ -219,6 +219,9 @@ thread_init (void)
   lock_init (&tid_lock);
   ready_list_init();
   list_init (&all_list);
+  
+  list_init(&current_thread->child_list);
+  lock_init(&current_thread->child_list_lock);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
