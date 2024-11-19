@@ -13,6 +13,8 @@ struct child_process {
   struct thread *parent;          // Pointer to the parent thread
   bool parent_alive;              // Flag indicating if the parent is alive
   struct list_elem elem;          // List element to add to parent's child list
+  int exit_status;
+  struct semaphore sema;
   // Add other fields as necessary (e.g., exit status)
 };
 

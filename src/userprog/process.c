@@ -43,13 +43,19 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   
-  struct child_process childProcess;
-  childProcess.tid = tid;
-  childProcess.parent = thread_current();
-  childProcess.parent_alive = true;
+  struct child_process *childProcess = malloc (sizeof(struct child_process));
+  if (childProcess == NULL) {
+    palloc_free_page (fn_copy);
+    return tid;
+  }
+  childProcess->tid = tid;
+  childProcess->parent = thread_current();
+  childProcess->parent_alive = true;
+  sema_init (&childProcess->sema, 0);
+  childProcess->exit_status = 0;
   
   lock_acquire(&thread_current()->child_list_lock);
-  list_push_back(&thread_current()->child_list, &childProcess.elem);
+  list_push_back(&thread_current()->child_list, &childProcess->elem);
   lock_release(&thread_current()->child_list_lock);
   
   return tid;
@@ -98,7 +104,32 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+  struct child_process *childProcess = NULL;
+  struct list_elem *e;
+
+  // Find the child in the current thread's child_list
+  lock_acquire(&thread_current()->child_list_lock);
+  for (e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
+    struct child_process *cp = list_entry(e, struct child_process, elem);
+    if (cp->tid == child_tid) {
+      childProcess = cp;
+      break;
+    }
+  }
+
+  if (childProcess == NULL) { // Child not found
+    lock_release(&thread_current()->child_list_lock);
+    return -1;
+  }
+
+  sema_down(&childProcess->sema);
+  // Sema upped
+
+  //Remove child from child_list
+  list_remove(&childProcess->elem);
+  lock_release(&thread_current()->child_list_lock);
+
+  return &childProcess->exit_status;
 }
 
 /* Free the current process's resources. */
