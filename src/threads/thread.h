@@ -116,13 +116,13 @@ struct thread
     struct list held_locks;             /* List of locks held by this thread */
     struct lock *waiting_on;            /* Current lock this thread is 
                                            waiting on */
-  
-    struct list child_list;         /* List of child_process structures */
-    struct lock child_list_lock;    /* Lock to protect access to child_list */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    
+    struct list child_list;         /* List of child_process structures */
+    struct lock child_list_lock;    /* Lock to protect access to child_list */
 #endif
 
     /* Owned by thread.c. */
