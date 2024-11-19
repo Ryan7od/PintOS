@@ -220,8 +220,7 @@ thread_init (void)
   ready_list_init();
   list_init (&all_list);
   
-  list_init(&current_thread->child_list);
-  lock_init(&current_thread->child_list_lock);
+  
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -718,8 +717,13 @@ init_thread (struct thread *t, const char *name, int priority)
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
 
+  // Initialise variables for priority donation
   list_init(&t->held_locks);
   t->waiting_on = NULL;
+  
+  // Initialise variables for child processes
+  list_init(&t->child_list);
+  lock_init(&t->child_list_lock);
 
   intr_set_level (old_level);
 }
