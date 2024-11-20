@@ -258,7 +258,7 @@ process_wait (tid_t child_tid UNUSED)
   list_remove(&child_process->elem);
   free(child_process);
   
-  return &child_process->exit_status;
+  return child_process->exit_status;
 }
 
 /* Free the current process's resources. */
