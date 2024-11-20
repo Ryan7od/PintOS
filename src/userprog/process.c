@@ -529,8 +529,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (!success)
     {
       /* If loading failed, close the file. */
-      file_allow_write(file);
-      file_close(file);
+      if (file != NULL) {
+          file_allow_write(file);
+          file_close(file);
+      }
     }
   /* Do not close the file if loading succeeded. */
   return success;
