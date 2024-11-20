@@ -43,9 +43,17 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+  
+  /* Get first arg out */
+  char *token, *token_ptr;
+  token = strtok_r ((char *)file_name, " ", &token_ptr);
+  // Handling multiple spaces
+  while (token != NULL && strcmp (token, "") == 0) {
+    token = strtok_r (NULL, " ", &token_ptr);
+  }
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     return tid;
