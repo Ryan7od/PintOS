@@ -131,7 +131,7 @@ syscall_handler (struct intr_frame *f)
       break;
 
     default:
-      printf("Unknown system call: %d\n", syscall_number);
+      // printf("Unknown system call: %d\n", syscall_number);
       sys_exit(-1);
       break;
   }
@@ -166,7 +166,7 @@ validate_user_pointer (const void *ptr)
   {
     sys_exit(-1);
   }
-  
+
   if (get_user((const uint8_t *)ptr) == -1)
   {
     sys_exit (-1);
