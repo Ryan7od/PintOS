@@ -15,14 +15,16 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
-#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "devices/timer.h"
 
 static thread_func start_process NO_RETURN;
-static bool setup_stack_with_args (void **esp, char *argv[], int argc, int max_args);
-static bool stack_overflow(void *esp, size_t size);
+
+static bool
+setup_stack_with_args (void **esp, char *argv[], int argc, int max_args);
+
+static bool stack_overflow (void *esp, size_t size);
+
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 /* Starts a new thread running a user program loaded from
@@ -32,6 +34,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
+  printf("Makes it to process execute\n");
   char *fn_copy;
   tid_t tid;
 
@@ -44,8 +47,37 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+  if (tid == TID_ERROR) {
+    palloc_free_page (fn_copy);
+    return tid;
+  }
+  
+  struct child_process *child_process = malloc (sizeof(struct child_process));
+  if (child_process == NULL) {
+    palloc_free_page (fn_copy);
+    return tid;
+  }
+  child_process->tid = tid;
+  child_process->parent = thread_current();
+  sema_init (&child_process->sema, 0);
+  child_process->exit_status = 0;
+  
+  struct thread *child_thread = thread_get_by_tid(tid);
+  if (child_thread != NULL) {
+    child_thread->child_process = child_process;
+  } else {
+    printf("couldn't find in map\n");
+    palloc_free_page (fn_copy);
+    return tid;
+  }
+  
+  printf("Init semaphore address: %p\n", (void *)&child_process->sema);
+  printf("Child process address 1: %p\n", (void *)&child_process);
+  printf("Child process address 2: %p\n", (void *)&child_thread->child_process);
+  lock_acquire(&thread_current()->child_list_lock);
+  list_push_back(&thread_current()->child_list, &child_process->elem);
+  lock_release(&thread_current()->child_list_lock);
+  
   return tid;
 }
 
@@ -54,6 +86,8 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
+  printf("Makes it to process start\n");
+  
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
@@ -63,55 +97,54 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-
   /* Parse the filename into argv */
   int max_args = 32;
   char *argv[max_args];
   int argc = 0;
-
+  
   /* Use strtok_r to go through file_name */
   char *token, *token_ptr;
   token = strtok_r (file_name, " ", &token_ptr);
   // Handling multiple spaces
-  while (token != NULL && strcmp(token, "") == 0) {
-      token = strtok_r (NULL, " ", &token_ptr);
+  while (token != NULL && strcmp (token, "") == 0) {
+    token = strtok_r (NULL, " ", &token_ptr);
   }
   // Assigning to argv
   while (token != NULL && argc < max_args) {
-      argv[argc] = malloc(strlen(token) + 1);
-      if (argv[argc] == NULL) {
-          thread_exit();
-      }
-      strlcpy(argv[argc], token, strlen(token) + 1);
-      argc++;
+    argv[ argc ] = malloc (strlen (token) + 1);
+    if (argv[ argc ] == NULL) {
+      thread_exit ();
+    }
+    strlcpy (argv[ argc ], token, strlen (token) + 1);
+    argc++;
+    token = strtok_r (NULL, " ", &token_ptr);
+    while (token != NULL && strcmp (token, "") == 0) {
       token = strtok_r (NULL, " ", &token_ptr);
-      while (token != NULL && strcmp(token, "") == 0) {
-          token = strtok_r (NULL, " ", &token_ptr);
-      }
+    }
   }
-  argv[argc] = NULL;
-
-  success = load (argv[0], &if_.eip, &if_.esp);
+  argv[ argc ] = NULL;
+  
+  success = load (argv[ 0 ], &if_.eip, &if_.esp);
   palloc_free_page (file_name);
-
+  
   /* If load failed, quit. */
   if (!success) {
-      for (int i = 0; i < argc; i++) {
-          free(argv[i]);
-      }
-      thread_exit();
+    for (int i = 0; i < argc; i++) {
+      free (argv[ i ]);
+    }
+    thread_exit ();
   }
-
+  
   /* Set up the stack using argv and argc and quit if failed */
   if (!setup_stack_with_args (&if_.esp, argv, argc, max_args)) {
-      for (int i = 0; i < argc; i++) {
-          free(argv[i]);
-      }
-      thread_exit();
+    for (int i = 0; i < argc; i++) {
+      free (argv[ i ]);
+    }
+    thread_exit ();
   }
-
+  
   for (int i = 0; i < argc; i++) {
-      free(argv[i]);
+    free (argv[ i ]);
   }
 
   /* Start the user process by simulating a return from an
@@ -130,60 +163,62 @@ start_process (void *file_name_)
  * then argc, then a fake return address of 0 */
 static bool
 setup_stack_with_args (void **esp, char **argv, int argc, int max_args) {
-    /* Set up an array with pointers to the arguments on the stack */
-    char *arg_addresses[max_args];
-    /* Put arguments directly onto stack in reverse order */
-    for (int i = argc - 1; i >= 0; i--) {
-        if (stack_overflow (*esp, strlen(argv[i]) + 1)) return false;
-        *esp -= strlen(argv[i]) + 1;
-        memcpy (*esp, argv[i], strlen(argv[i]) + 1);
-        arg_addresses[i] = *esp;
-    }
-
-    /* Word align the stack */
-    uintptr_t diff = (uintptr_t)*esp % 4;
-    if (diff != 0) {
-        if (stack_overflow (*esp, (size_t)diff)) return false;
-        *esp -= diff;
-        memset (*esp, 0, diff);
-    }
-
-    /* Push null pointer */
-    if (stack_overflow (*esp, sizeof (char *))) return false;
+  /* Set up an array with pointers to the arguments on the stack */
+  char *arg_addresses[max_args];
+  /* Put arguments directly onto stack in reverse order */
+  for (int i = argc - 1; i >= 0; i--) {
+    size_t size = strlen (argv[ i ]) + 1;
+    if (stack_overflow (*esp, size)) { return false; }
+    *esp -= size;
+    memcpy (*esp, argv[ i ], size);
+    arg_addresses[ i ] = *esp;
+  }
+  
+  /* Word align the stack */
+  uintptr_t diff = (uintptr_t) * esp % 4;
+  if (diff != 0) {
+    if (stack_overflow (*esp, (size_t)diff)) { return false; }
+    *esp -= diff;
+    memset (*esp, 0, diff);
+  }
+  
+  /* Push null pointer */
+  if (stack_overflow (*esp, sizeof (char *))) { return false; }
+  *esp -= sizeof (char *);
+  *(char **)*esp = NULL;
+  
+  /* Push argument adresses */
+  for (int i = argc - 1; i >= 0; i--) {
+    if (stack_overflow (*esp, sizeof (char *))) { return false; }
     *esp -= sizeof (char *);
-    *(char **)*esp = NULL;
-
-    /* Push argument adresses */
-    for (int i = argc - 1; i >= 0; i--) {
-        if (stack_overflow (*esp, sizeof (char *))) return false;
-        *esp -= sizeof (char *);
-        memcpy (*esp, &arg_addresses[i], sizeof (char *));
-    }
-
-    /* Push pointer to first element of arg_addresses */
-    char **argv_ptr = *esp;
-    if (stack_overflow (*esp, sizeof (char **))) return false;
-    *esp -= sizeof(char **);
-    memcpy (*esp, &argv_ptr, sizeof(char **));
-
-    /* Push argc */
-    if (stack_overflow (*esp, sizeof (int))) return false;
-    *esp -= sizeof(int);
-    *(int *)*esp = argc;
-
-    /* Push a fake return address */
-    if (stack_overflow (*esp, sizeof (void *))) return false;
-    *esp -= sizeof(void *);
-    *(void **)*esp = 0;
-
-    return true;
+    memcpy (*esp, &arg_addresses[ i ], sizeof (char *));
+  }
+  
+  /* Push pointer to first element of arg_addresses */
+  char **argv_ptr = *esp;
+  if (stack_overflow (*esp, sizeof (char **))) { return false; }
+  *esp -= sizeof (char **);
+  memcpy (*esp, &argv_ptr, sizeof (char **));
+  
+  /* Push argc */
+  if (stack_overflow (*esp, sizeof (int))) { return false; }
+  *esp -= sizeof (int);
+  *(int *)*esp = argc;
+  
+  /* Push a fake return address */
+  if (stack_overflow (*esp, sizeof (void *))) { return false; }
+  *esp -= sizeof (void *);
+  *(void **)*esp = 0;
+  
+  return true;
 }
 
 /* Function that checks if the stack has gone into stack overflow (used too
  * much space) and if so returns false and so exits the thread */
 static bool
 stack_overflow (void *esp, size_t size) {
-    return (uintptr_t)esp - size < (uintptr_t)(PHYS_BASE - PGSIZE);
+  return (uintptr_t)
+  esp - size < (uintptr_t) (PHYS_BASE - PGSIZE);
 }
 
 /* Waits for thread TID to die and returns its exit status. 
@@ -198,14 +233,43 @@ stack_overflow (void *esp, size_t size) {
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  timer_sleep(1000000);
-  return -1;
+  printf("Makes it to process wait\n");
+  
+  struct child_process *child_process = NULL;
+  struct list_elem *e;
+
+  // Find the child in the current thread's child_list
+  lock_acquire(&thread_current()->child_list_lock);
+  for (e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
+    struct child_process *cp = list_entry(e, struct child_process, elem);
+    if (cp->tid == child_tid) {
+      child_process = cp;
+      break;
+    }
+  }
+  lock_release(&thread_current()->child_list_lock);
+
+  if (child_process == NULL) { // Child not found
+    return -1;
+  }
+  
+  printf("Down semaphore address: %p\n", (void *)&child_process->sema);
+  sema_down(&child_process->sema);
+  // Sema upped
+  printf("Sema upped\n");
+  //Remove child from child_list
+  list_remove(&child_process->elem);
+  free(child_process);
+  printf("Gets to return in wait\n");
+  return &child_process->exit_status;
 }
 
 /* Free the current process's resources. */
 void
 process_exit (void)
 {
+  printf("Makes it to process exit\n");
+  
   struct thread *cur = thread_current ();
   uint32_t *pd;
 

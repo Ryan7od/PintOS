@@ -150,6 +150,7 @@ page_fault (struct intr_frame *f)
   if (!user) {
    f->eip = (void *) f->eax;
    f->eax = 0xffffffff;
+   printf("PANTIC\n");
    PANIC("Kernel bug - unexpected page fault in kernel mode");
   }
 

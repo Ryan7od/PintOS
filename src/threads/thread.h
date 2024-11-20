@@ -7,6 +7,8 @@
 #include <stdbool.h>
 #include "threads/fixed-point.h"
 #include "synch.h"
+#include "hash.h"
+#include "userprog/process.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -122,6 +124,11 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     struct list fd_list;  /* List of open file descriptors */
     int next_fd;          /* Next file descriptor number to assign */
+    
+    struct list child_list;         /* List of child_process structures */
+    struct lock child_list_lock;    /* Lock to protect access to child_list */
+    struct hash_elem hash_elem;     /* Hash map element for thread_map */
+    struct child_process *child_process;
 #endif
 
     /* Owned by thread.c. */
@@ -132,6 +139,10 @@ struct thread
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "mlfqs". */
 extern bool thread_mlfqs;
+
+extern struct hash all_map;
+unsigned thread_hash_func(const struct hash_elem *e, void *aux);
+bool thread_less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux);
 
 void thread_init (void);
 

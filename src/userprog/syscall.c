@@ -51,6 +51,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
+  printf("syscall\n");
   int syscall_number;
   int args[3];
   if (!is_user_vaddr(f->esp))
@@ -137,7 +138,6 @@ syscall_handler (struct intr_frame *f)
       sys_exit(-1);
       break;
   }
-
   thread_exit ();
 }
 
