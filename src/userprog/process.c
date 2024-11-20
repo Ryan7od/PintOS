@@ -129,16 +129,27 @@ start_process (void *file_name_)
       token = strtok_r (NULL, " ", &token_ptr);
     }
   }
-  argv[ argc ] = NULL;
+
+  palloc_free_page (file_name);
+
+  if (argc == max_args) {
+    for (int i = 0; i < argc; i++) {
+        free (argv[ i ]);
+    }
+    thread_current()->exit_status = -1;
+    thread_exit ();
+  } else {
+    argv[argc] = NULL;
+  }
   
   success = load (argv[ 0 ], &if_.eip, &if_.esp);
-  palloc_free_page (file_name);
   
   /* If load failed, quit. */
   if (!success) {
     for (int i = 0; i < argc; i++) {
       free (argv[ i ]);
     }
+    thread_current()->exit_status = -1;
     thread_exit ();
   }
   
@@ -147,6 +158,7 @@ start_process (void *file_name_)
     for (int i = 0; i < argc; i++) {
       free (argv[ i ]);
     }
+    thread_current()->exit_status = -1;
     thread_exit ();
   }
   
@@ -404,7 +416,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
-      goto done; 
+      goto done;
     }
 
   /* Read and verify executable header. */
@@ -629,7 +641,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE - 12;
+        *esp = PHYS_BASE;
       else
         palloc_free_page (kpage);
     }
