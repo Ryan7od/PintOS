@@ -129,6 +129,7 @@ struct thread
     struct lock child_list_lock;    /* Lock to protect access to child_list */
     struct hash_elem hash_elem;     /* Hash map element for thread_map */
     struct child_process *child_process;
+    struct file *executable;            /* Executable file. */
 #endif
 
     /* Owned by thread.c. */
