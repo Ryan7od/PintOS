@@ -56,6 +56,18 @@ process_execute (const char *file_name)
     token = strtok_r (NULL, " ", &token_ptr);
   }
 
+  /* Make sure file exists */
+  struct file *file = NULL;
+  file = filesys_open (fn_copy2);
+  if (file == NULL) {
+    printf ("load: %s: open failed\n", fn_copy2);
+    file_close(file);
+    palloc_free_page (fn_copy);
+    palloc_free_page (fn_copy2);
+    return TID_ERROR;
+  }
+  file_close(file);
+
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) {
