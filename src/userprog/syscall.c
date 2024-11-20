@@ -162,6 +162,11 @@ validate_buffer (const void *buffer, unsigned size)
 static void 
 validate_user_pointer (const void *ptr) 
 {
+  if (ptr == NULL || !is_user_vaddr(ptr))
+  {
+    sys_exit(-1);
+  }
+  
   if (get_user((const uint8_t *)ptr) == -1)
   {
     sys_exit (-1);
@@ -240,6 +245,11 @@ sys_open(const char *file)
   int fd = -1;
   struct thread *cur = thread_current();
   struct file_descriptor *fd_elem;
+
+  if (file == NULL)
+  {
+    return -1;
+  }
 
   validate_string(file);
 
