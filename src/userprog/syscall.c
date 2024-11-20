@@ -52,7 +52,12 @@ syscall_handler (struct intr_frame *f)
 {
   int syscall_number;
   int args[3];
-  if (f == NULL || !is_user_vaddr(f->esp) || f->esp == NULL || f->esp > PHYS_BASE || f->esp < PHYS_BASE - PGSIZE)
+  if (
+    f == NULL
+    || !is_user_vaddr(f->esp)
+    || f->esp == NULL
+    || pagedir_get_page(thread_current()->pagedir, f->esp) == NULL
+  )
     sys_exit(-1); // terminate if process is invalid
   
   syscall_number = *(int *)f->esp;
