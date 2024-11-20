@@ -28,6 +28,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
+  printf("Makes it to process execute\n");
   char *fn_copy;
   tid_t tid;
 
@@ -40,22 +41,35 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy);
-  
-  struct child_process *childProcess = malloc (sizeof(struct child_process));
-  if (childProcess == NULL) {
+  if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     return tid;
   }
-  childProcess->tid = tid;
-  childProcess->parent = thread_current();
-  childProcess->parent_alive = true;
-  sema_init (&childProcess->sema, 0);
-  childProcess->exit_status = 0;
   
+  struct child_process *child_process = malloc (sizeof(struct child_process));
+  if (child_process == NULL) {
+    palloc_free_page (fn_copy);
+    return tid;
+  }
+  child_process->tid = tid;
+  child_process->parent = thread_current();
+  sema_init (&child_process->sema, 0);
+  child_process->exit_status = 0;
+  
+  struct thread *child_thread = thread_get_by_tid(tid);
+  if (child_thread != NULL) {
+    child_thread->child_process = &child_process;
+  } else {
+    printf("couldn't find in map\n");
+    palloc_free_page (fn_copy);
+    return tid;
+  }
+  
+  printf("Init semaphore address: %p\n", (void *)&child_process->sema);
+  printf("Child process address 1: %p\n", (void *)&child_process);
+  printf("Child process address 2: %p\n", (void *)&child_thread->child_process);
   lock_acquire(&thread_current()->child_list_lock);
-  list_push_back(&thread_current()->child_list, &childProcess->elem);
+  list_push_back(&thread_current()->child_list, &child_process->elem);
   lock_release(&thread_current()->child_list_lock);
   
   return tid;
@@ -66,6 +80,8 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
+  printf("Makes it to process start\n");
+  
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
@@ -104,7 +120,9 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  struct child_process *childProcess = NULL;
+  printf("Makes it to process wait\n");
+  
+  struct child_process *child_process = NULL;
   struct list_elem *e;
 
   // Find the child in the current thread's child_list
@@ -112,30 +130,32 @@ process_wait (tid_t child_tid UNUSED)
   for (e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
     struct child_process *cp = list_entry(e, struct child_process, elem);
     if (cp->tid == child_tid) {
-      childProcess = cp;
+      child_process = cp;
       break;
     }
   }
-
-  if (childProcess == NULL) { // Child not found
-    lock_release(&thread_current()->child_list_lock);
-    return -1;
-  }
-
-  sema_down(&childProcess->sema);
-  // Sema upped
-
-  //Remove child from child_list
-  list_remove(&childProcess->elem);
   lock_release(&thread_current()->child_list_lock);
 
-  return &childProcess->exit_status;
+  if (child_process == NULL) { // Child not found
+    return -1;
+  }
+  
+  printf("Down semaphore address: %p\n", (void *)&child_process->sema);
+  sema_down(&child_process->sema);
+  // Sema upped
+  printf("Sema upped\n");
+  //Remove child from child_list
+  list_remove(&child_process->elem);
+  printf("Gets to return in wait\n");
+  return &child_process->exit_status;
 }
 
 /* Free the current process's resources. */
 void
 process_exit (void)
 {
+  printf("Makes it to process exit\n");
+  
   struct thread *cur = thread_current ();
   uint32_t *pd;
 

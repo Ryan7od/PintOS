@@ -88,7 +88,6 @@ syscall_handler (struct intr_frame *f UNUSED)
       sys_exit(-1);
       break;
   }
-
   thread_exit ();
 }
 

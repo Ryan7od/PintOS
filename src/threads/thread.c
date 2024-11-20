@@ -12,6 +12,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "threads/fixed-point.h"
+#include "hash.h"
 #include "devices/timer.h"
 
 #ifdef USERPROG
@@ -30,6 +31,9 @@ struct list ready_list[PRI_MAX - PRI_MIN + 1];
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
+
+/* Map from tid to thread */
+struct hash all_map;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -75,6 +79,28 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+
+unsigned thread_hash_func(const struct hash_elem *e, void *aux) {
+  const struct thread *t = hash_entry(e, struct thread, hash_elem);
+  return hash_int(t->tid);
+}
+
+bool thread_less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux) {
+  const struct thread *t_a = hash_entry(a, struct thread, hash_elem);
+  const struct thread *t_b = hash_entry(b, struct thread, hash_elem);
+  return t_a->tid < t_b->tid;
+}
+
+struct thread *thread_get_by_tid(tid_t tid) {
+  struct thread t;
+  struct hash_elem *e;
+  t.tid = tid;
+  e = hash_find(&all_map, &t.hash_elem);
+  if (e == NULL) {
+    return NULL;
+  }
+  return hash_entry(e, struct thread, hash_elem);
+}
 
 /* Returns true if ELEM is an interior element,
    false otherwise. */
@@ -219,8 +245,6 @@ thread_init (void)
   lock_init (&tid_lock);
   ready_list_init();
   list_init (&all_list);
-  
-  
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -409,6 +433,8 @@ thread_create (const char *name, int priority,
   sf->ebp = 0;
 
   intr_set_level (old_level);
+  
+  hash_insert (&all_map, &t->hash_elem);
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -504,6 +530,37 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
+  printf("1\n");
+  // Handle children
+  struct list *child_list = &thread_current()->child_list;
+  struct list_elem *e = list_begin(child_list);
+  lock_acquire(&thread_current()->child_list_lock);
+
+  while (e != list_end(child_list)) {
+    struct child_process *cp = list_entry(e, struct child_process, elem);
+    e = list_next(e);
+    printf("Orphaned child!\n");
+    cp->parent = NULL;
+  }
+  
+  lock_release(&thread_current()->child_list_lock);
+  printf("2\n");
+  
+  printf("3\n");
+  
+  // Handle parent
+  struct child_process *child_process = thread_current()->child_process;
+  if (child_process != NULL && child_process->parent != NULL) {
+    for (;;);
+    printf("Child process address 3: %p\n", (void *)&child_process);
+    child_process->exit_status = thread_current()->exit_status;
+    printf("About to up\n");
+    printf("Exit semaphore address: %p\n", (void *)&child_process->sema);
+    sema_up(&child_process->sema);
+    //free(child_process);
+  }
+  printf("4\n");
+  
   process_exit ();
 #endif
 
@@ -512,6 +569,7 @@ thread_exit (void)
      when it calls thread_schedule_tail(). */
   intr_disable ();
   list_remove (&thread_current()->allelem);
+  hash_delete (&all_map, &thread_current()->hash_elem);
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
@@ -724,6 +782,7 @@ init_thread (struct thread *t, const char *name, int priority)
   // Initialise variables for child processes
   list_init(&t->child_list);
   lock_init(&t->child_list_lock);
+  t->child_process = NULL;
 
   intr_set_level (old_level);
 }
