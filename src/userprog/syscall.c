@@ -39,12 +39,11 @@ static void sys_seek(int fd, unsigned position);
 static unsigned sys_tell(int fd);
 static void sys_close(int fd);
 
-static struct lock filesys_lock;
+struct lock filesys_lock;
 
 void
 syscall_init (void) 
 {
-  lock_init(&filesys_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 

@@ -12,6 +12,8 @@ struct file_descriptor {
   struct list_elem elem;      /* List element for inclusion in a list */
 };
 
+extern struct lock filesys_lock;
+
 void syscall_init (void);
 
 #endif /* userprog/syscall.h */
