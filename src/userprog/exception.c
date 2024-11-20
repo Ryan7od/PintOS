@@ -9,6 +9,7 @@
 static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
+static void divide_by_zero(struct intr_frame *f);
 static void page_fault (struct intr_frame *);
 
 /* Registers handlers for interrupts that can be caused by user
@@ -26,6 +27,7 @@ static void page_fault (struct intr_frame *);
 
    Refer to [IA32-v3a] section 5.15 "Exception and Interrupt
    Reference" for a description of each of these exceptions. */
+
 void
 exception_init (void) 
 {
@@ -41,7 +43,7 @@ exception_init (void)
      invoking them via the INT instruction.  They can still be
      caused indirectly, e.g. #DE can be caused by dividing by
      0.  */
-  intr_register_int (0, 0, INTR_ON, kill, "#DE Divide Error");
+  intr_register_int (0, 0, INTR_ON, divide_by_zero, "#DE Divide Error");
   intr_register_int (1, 0, INTR_ON, kill, "#DB Debug Exception");
   intr_register_int (6, 0, INTR_ON, kill, "#UD Invalid Opcode Exception");
   intr_register_int (7, 0, INTR_ON, kill, "#NM Device Not Available Exception");
@@ -62,6 +64,46 @@ void
 exception_print_stats (void) 
 {
   printf ("Exception: %lld page faults\n", page_fault_cnt);
+}
+
+static void
+divide_by_zero(struct intr_frame *f) 
+{
+  /* This interrupt is one (probably) caused by a user process.
+     For example, the process might have tried to access unmapped
+     virtual memory (a page fault).  For now, we simply kill the
+     user process.  Later, we'll want to handle page faults in
+     the kernel.  Real Unix-like operating systems pass most
+     exceptions back to the process via signals, but we don't
+     implement them. */
+     
+  /* The interrupt frame's code segment value tells us where the
+     exception originated. */
+  switch (f->cs)
+    {
+    case SEL_UCSEG:
+      /* User's code segment, so it's a user exception, as we
+         expected.  Kill the user process.  */
+      printf ("%s: exit(-1)\n",
+              thread_name ());
+      thread_current () -> exit_status = -1;
+      thread_exit (); 
+
+    case SEL_KCSEG:
+      /* Kernel's code segment, which indicates a kernel bug.
+         Kernel code shouldn't throw exceptions.  (Page faults
+         may cause kernel exceptions--but they shouldn't arrive
+         here.)  Panic the kernel to make the point.  */
+      intr_dump_frame (f);
+      PANIC ("Kernel bug - unexpected interrupt in kernel"); 
+
+    default:
+      /* Some other code segment?  
+         Shouldn't happen.  Panic the kernel. */
+      printf ("Interrupt %#04x (%s) in unknown segment %04x\n",
+             f->vec_no, intr_name (f->vec_no), f->cs);
+      PANIC ("Kernel bug - this shouldn't be possible!");
+    }
 }
 
 /* Handler for an exception (probably) caused by a user process. */
@@ -86,6 +128,7 @@ kill (struct intr_frame *f)
       printf ("%s: dying due to interrupt %#04x (%s).\n",
               thread_name (), f->vec_no, intr_name (f->vec_no));
       intr_dump_frame (f);
+      thread_current () -> exit_status = -1;
       thread_exit (); 
 
     case SEL_KCSEG:
