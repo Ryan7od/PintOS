@@ -91,12 +91,55 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
-
-  /* If load failed, quit. */
+  /* Parse the filename into argv */
+  int max_args = 32;
+  char *argv[max_args];
+  int argc = 0;
+  
+  /* Use strtok_r to go through file_name */
+  char *token, *token_ptr;
+  token = strtok_r (file_name, " ", &token_ptr);
+  // Handling multiple spaces
+  while (token != NULL && strcmp (token, "") == 0) {
+    token = strtok_r (NULL, " ", &token_ptr);
+  }
+  // Assigning to argv
+  while (token != NULL && argc < max_args) {
+    argv[ argc ] = malloc (strlen (token) + 1);
+    if (argv[ argc ] == NULL) {
+      thread_exit ();
+    }
+    strlcpy (argv[ argc ], token, strlen (token) + 1);
+    argc++;
+    token = strtok_r (NULL, " ", &token_ptr);
+    while (token != NULL && strcmp (token, "") == 0) {
+      token = strtok_r (NULL, " ", &token_ptr);
+    }
+  }
+  argv[ argc ] = NULL;
+  
+  success = load (argv[ 0 ], &if_.eip, &if_.esp);
   palloc_free_page (file_name);
-  if (!success) 
+  
+  /* If load failed, quit. */
+  if (!success) {
+    for (int i = 0; i < argc; i++) {
+      free (argv[ i ]);
+    }
     thread_exit ();
+  }
+  
+  /* Set up the stack using argv and argc and quit if failed */
+  if (!setup_stack_with_args (&if_.esp, argv, argc, max_args)) {
+    for (int i = 0; i < argc; i++) {
+      free (argv[ i ]);
+    }
+    thread_exit ();
+  }
+  
+  for (int i = 0; i < argc; i++) {
+    free (argv[ i ]);
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
