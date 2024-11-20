@@ -253,12 +253,14 @@ process_wait (tid_t child_tid UNUSED)
   }
   
   sema_down(&child_process->sema);
+  
+  int exit_status = child_process->exit_status;
   // Sema upped
   //Remove child from child_list
   list_remove(&child_process->elem);
   free(child_process);
   
-  return child_process->exit_status;
+  return exit_status;
 }
 
 /* Free the current process's resources. */
