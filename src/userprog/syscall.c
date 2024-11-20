@@ -40,6 +40,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
+  printf("syscall\n");
   int syscall_number;
   int args[3];
   if (!is_user_vaddr(f->esp))

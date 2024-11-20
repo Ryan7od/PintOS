@@ -19,6 +19,12 @@
 #include "threads/vaddr.h"
 
 static thread_func start_process NO_RETURN;
+
+static bool
+setup_stack_with_args (void **esp, char *argv[], int argc, int max_args);
+
+static bool stack_overflow (void *esp, size_t size);
+
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 /* Starts a new thread running a user program loaded from
@@ -58,7 +64,7 @@ process_execute (const char *file_name)
   
   struct thread *child_thread = thread_get_by_tid(tid);
   if (child_thread != NULL) {
-    child_thread->child_process = &child_process;
+    child_thread->child_process = child_process;
   } else {
     printf("couldn't find in map\n");
     palloc_free_page (fn_copy);
@@ -253,6 +259,7 @@ process_wait (tid_t child_tid UNUSED)
   printf("Sema upped\n");
   //Remove child from child_list
   list_remove(&child_process->elem);
+  free(child_process);
   printf("Gets to return in wait\n");
   return &child_process->exit_status;
 }

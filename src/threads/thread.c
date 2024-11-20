@@ -530,7 +530,6 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
-  printf("1\n");
   // Handle children
   struct list *child_list = &thread_current()->child_list;
   struct list_elem *e = list_begin(child_list);
@@ -539,27 +538,19 @@ thread_exit (void)
   while (e != list_end(child_list)) {
     struct child_process *cp = list_entry(e, struct child_process, elem);
     e = list_next(e);
-    printf("Orphaned child!\n");
     cp->parent = NULL;
   }
   
   lock_release(&thread_current()->child_list_lock);
-  printf("2\n");
-  
-  printf("3\n");
   
   // Handle parent
   struct child_process *child_process = thread_current()->child_process;
   if (child_process != NULL && child_process->parent != NULL) {
-    for (;;);
-    printf("Child process address 3: %p\n", (void *)&child_process);
     child_process->exit_status = thread_current()->exit_status;
-    printf("About to up\n");
-    printf("Exit semaphore address: %p\n", (void *)&child_process->sema);
     sema_up(&child_process->sema);
-    //free(child_process);
+  } else {
+    free(child_process);
   }
-  printf("4\n");
   
   process_exit ();
 #endif
