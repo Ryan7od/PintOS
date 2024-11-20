@@ -51,15 +51,12 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  printf("syscall\n");
   int syscall_number;
   int args[3];
   if (!is_user_vaddr(f->esp))
     sys_exit(-1); // terminate if process is invalid
   
   syscall_number = *(int *)f->esp;
-
-  printf ("system call!\n");
 
   switch (syscall_number)
   {
@@ -138,7 +135,6 @@ syscall_handler (struct intr_frame *f)
       sys_exit(-1);
       break;
   }
-  thread_exit ();
 }
 
 static void 
@@ -147,7 +143,7 @@ get_args (struct intr_frame *f, int *args, int num_args)
   int *ptr;
   for (int i = 0; i < num_args; i++)
   {
-    ptr = (int *)f->esp + i + 1; // +1 to skip syscall_number
+    ptr = (int *)f->esp + i + 1;
     validate_user_pointer((const void *)ptr);
     args[i] = *ptr;
   }
