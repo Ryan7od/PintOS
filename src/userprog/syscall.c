@@ -53,7 +53,7 @@ syscall_handler (struct intr_frame *f)
 {
   int syscall_number;
   int args[3];
-  if (!is_user_vaddr(f->esp))
+  if (f == NULL || !is_user_vaddr(f->esp) || f->esp == NULL)
     sys_exit(-1); // terminate if process is invalid
   
   syscall_number = *(int *)f->esp;
@@ -162,7 +162,7 @@ validate_buffer (const void *buffer, unsigned size)
 static void 
 validate_user_pointer (const void *ptr) 
 {
-  if (ptr == NULL || !is_user_vaddr(ptr))
+  if (ptr == NULL || !is_user_vaddr(ptr) || pagedir_get_page(thread_current()->pagedir, ptr) == NULL)
   {
     sys_exit(-1);
   }
@@ -176,6 +176,11 @@ validate_user_pointer (const void *ptr)
 static void
 validate_string(const char *str)
 {
+  if (str == NULL)
+  {
+    sys_exit(-1);
+  }
+
   while (true)
     {
       validate_user_pointer((const void *)str);
@@ -217,6 +222,11 @@ sys_wait (pid_t pid)
 static bool
 sys_create (const char *file, unsigned initial_size)
 {
+  if (file == NULL)
+  {
+    sys_exit(-1); // Or return false
+  }
+
   bool success;
 
   lock_acquire(&filesys_lock);
