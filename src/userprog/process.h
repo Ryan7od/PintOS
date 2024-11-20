@@ -15,9 +15,8 @@ struct child_process {
   tid_t tid;                      // Thread ID of the child
   struct thread *parent;          // Pointer to the parent thread
   struct list_elem elem;          // List element to add to parent's child list
-  int exit_status;
-  struct semaphore sema;
-  // Add other fields as necessary (e.g., exit status)
+  int exit_status;                // Exit status of the child
+  struct semaphore sema;          // Semaphore to block parent
 };
 
 /* Process ID type */
