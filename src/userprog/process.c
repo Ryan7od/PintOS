@@ -36,17 +36,21 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
-
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-  
+
   /* Get first arg out */
+  char *fn_copy2;
+  fn_copy2 = palloc_get_page (0);
+  if (fn_copy2 == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy2, file_name, PGSIZE);
   char *token, *token_ptr;
-  token = strtok_r ((char *)file_name, " ", &token_ptr);
+  token = strtok_r (fn_copy2, " ", &token_ptr);
   // Handling multiple spaces
   while (token != NULL && strcmp (token, "") == 0) {
     token = strtok_r (NULL, " ", &token_ptr);
@@ -56,9 +60,10 @@ process_execute (const char *file_name)
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
+    palloc_free_page (fn_copy2);
     return tid;
   }
-  
+
   struct child_process *child_process = malloc (sizeof(struct child_process));
   if (child_process == NULL) {
     palloc_free_page (fn_copy);
@@ -68,19 +73,20 @@ process_execute (const char *file_name)
   child_process->parent = thread_current();
   sema_init (&child_process->sema, 0);
   child_process->exit_status = 0;
-  
+
   struct thread *child_thread = thread_get_by_tid(tid);
   if (child_thread != NULL) {
     child_thread->child_process = child_process;
   } else {
     palloc_free_page (fn_copy);
+    palloc_free_page (fn_copy2);
     return tid;
   }
 
   lock_acquire(&thread_current()->child_list_lock);
   list_push_back(&thread_current()->child_list, &child_process->elem);
   lock_release(&thread_current()->child_list_lock);
-  
+
   return tid;
 }
 
