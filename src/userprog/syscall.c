@@ -26,7 +26,7 @@ static struct file_descriptor *get_file_descriptor(int fd);
 
 /* System call functions */
 static void sys_halt(void);
-void sys_exit(int status);
+static void sys_exit(int status);
 static pid_t sys_exec(const char *cmd_line);
 static int sys_wait(pid_t pid);
 static bool sys_create(const char *file, unsigned initial_size);
@@ -197,7 +197,7 @@ sys_halt (void)
   shutdown_power_off ();
 }
 
-void
+static void
 sys_exit (int status)
 {
   struct thread *cur = thread_current ();
