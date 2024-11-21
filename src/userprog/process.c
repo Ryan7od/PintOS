@@ -22,9 +22,7 @@
 static thread_func start_process NO_RETURN;
 
 static bool
-setup_stack_with_args (void **esp, char *argv[], int argc, int max_args);
-
-static bool stack_overflow (void *esp, size_t size);
+setup_stack_with_args (void **esp, char *argv[], int argc);
 
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -61,15 +59,14 @@ process_execute (const char *file_name)
   struct file *file = NULL;
   lock_acquire(&filesys_lock);
   file = filesys_open (fn_copy2);
+  lock_release(&filesys_lock);
   if (file == NULL) {
     printf ("load: %s: open failed\n", fn_copy2);
-    lock_release(&filesys_lock);
     palloc_free_page (fn_copy);
     palloc_free_page (fn_copy2);
     return TID_ERROR;
   }
   file_close(file);
-  lock_release(&filesys_lock);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
@@ -119,8 +116,16 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+
   /* Parse the filename into argv */
-  int max_args = 32;
+  // Find total size of stack
+  int stack_size = 0;
+  stack_size += sizeof (char *);        // NULL pointer
+  stack_size += sizeof (char **);       // pointer to argv pointer array
+  stack_size += sizeof (int);           // argc
+  stack_size += sizeof (void *);        // return address
+
+  int max_args = (PGSIZE - stack_size) / (2 + sizeof (char *));
   char *argv[max_args];
   int argc = 0;
   
@@ -131,14 +136,20 @@ start_process (void *file_name_)
   while (token != NULL && strcmp (token, "") == 0) {
     token = strtok_r (NULL, " ", &token_ptr);
   }
+
   // Assigning to argv
-  while (token != NULL && argc < max_args) {
+  while (token != NULL) {
+    stack_size += strlen (token) + 1; // argv
+    stack_size += sizeof (char *);      // pointer to argv in stack
+    if (stack_size >= PGSIZE) {
+        break;
+    }
+
     argv[ argc ] = malloc (strlen (token) + 1);
     if (argv[ argc ] == NULL) {
       thread_exit ();
     }
-    strlcpy (argv[ argc ], token, strlen (token) + 1);
-    argc++;
+    strlcpy (argv[ argc++ ], token, strlen (token) + 1);
     token = strtok_r (NULL, " ", &token_ptr);
     while (token != NULL && strcmp (token, "") == 0) {
       token = strtok_r (NULL, " ", &token_ptr);
@@ -147,7 +158,8 @@ start_process (void *file_name_)
 
   palloc_free_page (file_name);
 
-  if (argc == max_args) {
+  // Handle overflow overflow
+  if (stack_size > PGSIZE) {
     for (int i = 0; i < argc; i++) {
         free (argv[ i ]);
     }
@@ -169,7 +181,7 @@ start_process (void *file_name_)
   }
   
   /* Set up the stack using argv and argc and quit if failed */
-  if (!setup_stack_with_args (&if_.esp, argv, argc, max_args)) {
+  if (!setup_stack_with_args (&if_.esp, argv, argc)) {
     for (int i = 0; i < argc; i++) {
       free (argv[ i ]);
     }
@@ -196,13 +208,12 @@ start_process (void *file_name_)
  * followed by word aligning it, then a null sentinel, then a pointer to argv,
  * then argc, then a fake return address of 0 */
 static bool
-setup_stack_with_args (void **esp, char **argv, int argc, int max_args) {
+setup_stack_with_args (void **esp, char **argv, int argc) {
   /* Set up an array with pointers to the arguments on the stack */
-  char *arg_addresses[max_args];
+  char *arg_addresses[argc];
   /* Put arguments directly onto stack in reverse order */
   for (int i = argc - 1; i >= 0; i--) {
     size_t size = strlen (argv[ i ]) + 1;
-    if (stack_overflow (*esp, size)) { return false; }
     *esp -= size;
     memcpy (*esp, argv[ i ], size);
     arg_addresses[ i ] = *esp;
@@ -211,48 +222,34 @@ setup_stack_with_args (void **esp, char **argv, int argc, int max_args) {
   /* Word align the stack */
   uintptr_t diff = (uintptr_t) * esp % 4;
   if (diff != 0) {
-    if (stack_overflow (*esp, (size_t)diff)) { return false; }
     *esp -= diff;
     memset (*esp, 0, diff);
   }
   
   /* Push null pointer */
-  if (stack_overflow (*esp, sizeof (char *))) { return false; }
   *esp -= sizeof (char *);
   *(char **)*esp = NULL;
   
-  /* Push argument adresses */
+  /* Push argument addresses */
   for (int i = argc - 1; i >= 0; i--) {
-    if (stack_overflow (*esp, sizeof (char *))) { return false; }
     *esp -= sizeof (char *);
     memcpy (*esp, &arg_addresses[ i ], sizeof (char *));
   }
   
   /* Push pointer to first element of arg_addresses */
   char **argv_ptr = *esp;
-  if (stack_overflow (*esp, sizeof (char **))) { return false; }
   *esp -= sizeof (char **);
   memcpy (*esp, &argv_ptr, sizeof (char **));
   
   /* Push argc */
-  if (stack_overflow (*esp, sizeof (int))) { return false; }
   *esp -= sizeof (int);
   *(int *)*esp = argc;
   
   /* Push a fake return address */
-  if (stack_overflow (*esp, sizeof (void *))) { return false; }
   *esp -= sizeof (void *);
   *(void **)*esp = 0;
   
   return true;
-}
-
-/* Function that checks if the stack has gone into stack overflow (used too
- * much space) and if so returns false and so exits the thread */
-static bool
-stack_overflow (void *esp, size_t size) {
-  return (uintptr_t)
-  esp - size < (uintptr_t) (PHYS_BASE - PGSIZE);
 }
 
 /* Waits for thread TID to die and returns its exit status. 
