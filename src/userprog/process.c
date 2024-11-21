@@ -339,7 +339,6 @@ process_exit (void) {
   
   /* Handle executable file */
   if (cur->executable != NULL) {
-    file_allow_write (cur->executable);
     file_close (cur->executable);
     cur->executable = NULL;
   }
@@ -595,7 +594,6 @@ load (const char *file_name, void (**eip) (void), void **esp) {
     /* If loading failed, close the file. */
     if (file != NULL) {
       lock_acquire (&filesys_lock);
-      file_allow_write (file);
       file_close (file);
       lock_release (&filesys_lock);
     }
