@@ -303,6 +303,28 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  // Handle children
+  struct list *child_list = &cur->child_list;
+  struct list_elem *e = list_begin(child_list);
+  lock_acquire(&cur->child_list_lock);
+
+  while (e != list_end(child_list)) {
+    struct child_process *cp = list_entry(e, struct child_process, elem);
+    e = list_next(e);
+    cp->parent = NULL;
+  }
+  
+  lock_release(&cur->child_list_lock);
+  
+  // Handle parent
+  struct child_process *child_process = cur->child_process;
+  if (child_process != NULL && child_process->parent != NULL) {
+    child_process->exit_status = cur->exit_status;
+    sema_up(&child_process->sema);
+  } else {
+    free(child_process);
+  }
+
   if (cur->executable != NULL)
     {
       file_allow_write(cur->executable);
@@ -310,18 +332,18 @@ process_exit (void)
       cur->executable = NULL;
     }
 
-    lock_acquire(&filesys_lock);
-    
-    while (!list_empty(&cur->fd_list))
+  lock_acquire(&filesys_lock);
+  
+  while (!list_empty(&cur->fd_list))
     {
-        struct list_elem *e = list_pop_front(&cur->fd_list);
-        struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
+      struct list_elem *e = list_pop_front(&cur->fd_list);
+      struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
 
-        file_close(fd_elem->file);
-        free(fd_elem);
+      file_close(fd_elem->file);
+      free(fd_elem);
     }
 
-    lock_release(&filesys_lock);
+  lock_release(&filesys_lock);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

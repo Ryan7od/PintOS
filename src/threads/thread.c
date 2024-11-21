@@ -528,28 +528,6 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
-  // Handle children
-  struct list *child_list = &thread_current()->child_list;
-  struct list_elem *e = list_begin(child_list);
-  lock_acquire(&thread_current()->child_list_lock);
-
-  while (e != list_end(child_list)) {
-    struct child_process *cp = list_entry(e, struct child_process, elem);
-    e = list_next(e);
-    cp->parent = NULL;
-  }
-  
-  lock_release(&thread_current()->child_list_lock);
-  
-  // Handle parent
-  struct child_process *child_process = thread_current()->child_process;
-  if (child_process != NULL && child_process->parent != NULL) {
-    child_process->exit_status = thread_current()->exit_status;
-    sema_up(&child_process->sema);
-  } else {
-    free(child_process);
-  }
-  
   process_exit ();
 #endif
 
