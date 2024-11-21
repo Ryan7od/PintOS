@@ -161,6 +161,9 @@ start_process (void *file_name_) {
     
     argv[ argc ] = malloc (strlen (token) + 1);
     if (argv[ argc ] == NULL) {
+      for (int i = 0; i < argc; i++) {
+        free (argv [ i ]);
+      }
       thread_exit ();
     }
     strlcpy (argv[ argc++ ], token, strlen (token) + 1);
