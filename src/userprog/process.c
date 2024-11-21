@@ -19,6 +19,12 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+#define PUSH_STACK(size, value)                 \
+    do {                                        \
+        *esp -= (size);                         \
+        memcpy(*esp, (value), (size));          \
+    } while (0)
+
 static thread_func start_process NO_RETURN;
 
 static bool
@@ -209,45 +215,40 @@ start_process (void *file_name_)
  * then argc, then a fake return address of 0 */
 static bool
 setup_stack_with_args (void **esp, char **argv, int argc) {
+  void *null_ptr = NULL;
+
   /* Set up an array with pointers to the arguments on the stack */
   char *arg_addresses[argc];
   /* Put arguments directly onto stack in reverse order */
   for (int i = argc - 1; i >= 0; i--) {
     size_t size = strlen (argv[ i ]) + 1;
-    *esp -= size;
-    memcpy (*esp, argv[ i ], size);
+    PUSH_STACK(size, argv[ i]);
     arg_addresses[ i ] = *esp;
   }
   
   /* Word align the stack */
   uintptr_t diff = (uintptr_t) * esp % 4;
   if (diff != 0) {
-    *esp -= diff;
-    memset (*esp, 0, diff);
+    PUSH_STACK(diff, &null_ptr);
   }
   
   /* Push null pointer */
-  *esp -= sizeof (char *);
-  *(char **)*esp = NULL;
+  PUSH_STACK(sizeof (char *), &null_ptr);
   
   /* Push argument addresses */
   for (int i = argc - 1; i >= 0; i--) {
-    *esp -= sizeof (char *);
-    memcpy (*esp, &arg_addresses[ i ], sizeof (char *));
+    PUSH_STACK(sizeof (char *), &arg_addresses[ i ]);
   }
   
   /* Push pointer to first element of arg_addresses */
   char **argv_ptr = *esp;
-  *esp -= sizeof (char **);
-  memcpy (*esp, &argv_ptr, sizeof (char **));
+  PUSH_STACK(sizeof (char **), &argv_ptr);
   
   /* Push argc */
-  *esp -= sizeof (int);
-  *(int *)*esp = argc;
+  PUSH_STACK(sizeof (int), &argc);
   
   /* Push a fake return address */
-  *esp -= sizeof (void *);
-  *(void **)*esp = 0;
+  PUSH_STACK(sizeof (void *), &null_ptr);
   
   return true;
 }
