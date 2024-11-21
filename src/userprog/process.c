@@ -91,7 +91,6 @@ process_execute (const char *file_name) {
   /* Set up the child process */
   struct child_process *child_process = malloc (sizeof (struct child_process));
   if (child_process == NULL) {
-    palloc_free_page (fn_copy);
     return tid;
   }
   child_process->tid = tid;
@@ -105,7 +104,6 @@ process_execute (const char *file_name) {
   if (child_thread != NULL) {
     child_thread->child_process = child_process;
   } else {
-    palloc_free_page (fn_copy);
     return tid;
   }
   
