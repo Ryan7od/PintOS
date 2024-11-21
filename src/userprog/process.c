@@ -310,6 +310,19 @@ process_exit (void)
       cur->executable = NULL;
     }
 
+    lock_acquire(&filesys_lock);
+    
+    while (!list_empty(&cur->fd_list))
+    {
+        struct list_elem *e = list_pop_front(&cur->fd_list);
+        struct file_descriptor *fd_elem = list_entry(e, struct file_descriptor, elem);
+
+        file_close(fd_elem->file);
+        free(fd_elem);
+    }
+
+    lock_release(&filesys_lock);
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -434,21 +447,23 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  lock_acquire (&filesys_lock);
+  lock_acquire (&filesys_lock);  // Acquire before opening
   file = filesys_open (file_name);
-  lock_release (&filesys_lock);
   if (file == NULL) 
     {
+      lock_release (&filesys_lock);  // Release before returning
       printf ("load: %s: open failed\n", file_name);
       goto done;
     }
    /* Deny write to the executable file. */
   file_deny_write(file);
+  lock_release (&filesys_lock );  // Release after modifying
 
   /* Store the executable file in the thread structure. */
   t->executable = file;
 
   /* Read and verify executable header. */
+  lock_acquire (&filesys_lock);  // Acquire before reading
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
       || ehdr.e_type != 2
@@ -457,9 +472,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
     {
+      lock_release (&filesys_lock);  // Release before returning
       printf ("load: %s: error loading executable\n", file_name);
       goto done; 
     }
+  lock_release (&filesys_lock );  // Release after reading
 
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
@@ -469,11 +486,18 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
       if (file_ofs < 0 || file_ofs > file_length (file))
         goto done;
+
+      lock_acquire (&filesys_lock);  // Acquire before seeking and reading
       file_seek (file, file_ofs);
 
-      if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
+      if (file_read (file, &phdr, sizeof phdr) != sizeof phdr) {
+        lock_release (&filesys_lock);
         goto done;
+      }
+      lock_release (&filesys_lock);
+
       file_ofs += sizeof phdr;
+
       switch (phdr.p_type) 
         {
         case PT_NULL:
@@ -535,8 +559,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
     {
       /* If loading failed, close the file. */
       if (file != NULL) {
+          lock_acquire (&filesys_lock);
           file_allow_write(file);
           file_close(file);
+          lock_release (&filesys_lock);
       }
     }
   /* Do not close the file if loading succeeded. */
