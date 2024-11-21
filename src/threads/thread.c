@@ -14,6 +14,7 @@
 #include "threads/fixed-point.h"
 #include "hash.h"
 #include "devices/timer.h"
+#include "userprog/syscall.h"
 
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -538,6 +539,16 @@ thread_exit (void) {
 #ifdef USERPROG
   process_exit ();
 #endif
+  struct thread *cur = thread_current ();
+  struct list_elem *e = list_begin(&cur->fd_list);
+
+  while (e != list_end(&cur->fd_list)) {
+    struct file_descriptor *fd = list_entry(e, struct file_descriptor, elem);
+    e = list_next(e);
+    list_remove(&fd->elem);
+    file_close(fd->file);
+    free(fd);
+  }
   
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
