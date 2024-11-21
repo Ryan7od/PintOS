@@ -121,15 +121,15 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     int exit_status;
-    uint32_t *pagedir;                  /* Page directory. */
+    uint32_t *pagedir;    /* Page directory. */
     struct list fd_list;  /* List of open file descriptors */
     int next_fd;          /* Next file descriptor number to assign */
     
-    struct list child_list;         /* List of child_process structures */
-    struct lock child_list_lock;    /* Lock to protect access to child_list */
-    struct hash_elem hash_elem;     /* Hash map element for thread_map */
-    struct child_process *child_process;
-    struct file *executable;            /* Executable file. */
+    struct list child_list;              /* List of child_process structures */
+    struct lock child_list_lock;         /* Lock to protect access to child_list */
+    struct hash_elem hash_elem;          /* Hash map element for thread_map */
+    struct child_process *child_process; /* Relevant child_process */
+    struct file *executable;             /* Executable file. */
 #endif
 
     /* Owned by thread.c. */

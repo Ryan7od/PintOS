@@ -67,6 +67,7 @@ exception_print_stats (void)
   printf ("Exception: %lld page faults\n", page_fault_cnt);
 }
 
+/* Graceful exit call if the user tries to divide by 0 */
 static void
 divide_by_zero(struct intr_frame *f) 
 {

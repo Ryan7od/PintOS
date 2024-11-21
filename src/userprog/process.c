@@ -84,6 +84,7 @@ process_execute (const char *file_name)
     return tid;
   }
 
+  /* Set up the child process */
   struct child_process *child_process = malloc (sizeof(struct child_process));
   if (child_process == NULL) {
     palloc_free_page (fn_copy);
@@ -95,6 +96,7 @@ process_execute (const char *file_name)
   child_process->exit_status = 0;
   child_process->dead = false;
 
+  /* Assign the child_process to the relative thread */
   struct thread *child_thread = thread_get_by_tid(tid);
   if (child_thread != NULL) {
     child_thread->child_process = child_process;
@@ -104,6 +106,7 @@ process_execute (const char *file_name)
     return tid;
   }
 
+  /* Add the child_process to the parent's list */
   lock_acquire(&thread_current()->child_list_lock);
   list_push_back(&thread_current()->child_list, &child_process->elem);
   lock_release(&thread_current()->child_list_lock);
@@ -127,13 +130,14 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
 
   /* Parse the filename into argv */
-  // Find total size of stack
+  /* Find total size of stack */
   int stack_size = 0;
   stack_size += sizeof (char *);        // NULL pointer
   stack_size += sizeof (char **);       // pointer to argv pointer array
   stack_size += sizeof (int);           // argc
   stack_size += sizeof (void *);        // return address
 
+  /* Calculate the max args dynamically */
   int max_args = (PGSIZE - stack_size) / (2 + sizeof (char *));
   char *argv[max_args];
   int argc = 0;
@@ -287,8 +291,7 @@ process_wait (tid_t child_tid UNUSED)
   }
   
   sema_down(&child_process->sema);
-  
-  // Sema upped
+
   //Remove child from child_list
   list_remove(&child_process->elem);
   
@@ -313,6 +316,7 @@ process_exit (void)
     struct child_process *cp = list_entry(e, struct child_process, elem);
     e = list_next(e);
     cp->parent = NULL;
+    /* If the child is dead free it */
     if (cp->dead) {
         free (cp);
     }
@@ -323,6 +327,7 @@ process_exit (void)
   // Handle parent
   struct child_process *child_process = cur->child_process;
   if (child_process != NULL && child_process->parent != NULL) {
+    /* If the child has a parent, propagate exit status and set to dead */
     child_process->exit_status = cur->exit_status;
     child_process->dead = true;
     sema_up(&child_process->sema);
@@ -330,6 +335,7 @@ process_exit (void)
     free(child_process);
   }
 
+  /* Handle executable file */
   if (cur->executable != NULL)
     {
       file_allow_write(cur->executable);
@@ -337,8 +343,8 @@ process_exit (void)
       cur->executable = NULL;
     }
 
+  /* Handle all of the fd's */
   lock_acquire(&filesys_lock);
-  
   while (!list_empty(&cur->fd_list))
     {
       struct list_elem *e = list_pop_front(&cur->fd_list);
@@ -347,7 +353,6 @@ process_exit (void)
       file_close(fd_elem->file);
       free(fd_elem);
     }
-
   lock_release(&filesys_lock);
 
   /* Destroy the current process's page directory and switch back

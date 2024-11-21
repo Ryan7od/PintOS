@@ -71,6 +71,9 @@ syscall_init(void)
   syscall_table[SYS_CLOSE] = sys_close;
 }
 
+/* Function that handles all syscall calls from threads, reading necessary
+ * arguments from the stack and performing different operations based on the
+ * given syscall number */
 static void
 syscall_handler(struct intr_frame *f)
 {
@@ -94,6 +97,7 @@ syscall_handler(struct intr_frame *f)
 
 /* System call handler implementations */
 
+/* Completely shuts down pintos */
 static int
 sys_halt(struct intr_frame *f UNUSED)
 {
@@ -101,6 +105,7 @@ sys_halt(struct intr_frame *f UNUSED)
   return 0;
 }
 
+/* Exits the current thread gracefully */
 static int
 sys_exit (struct intr_frame *f)
 {
@@ -133,6 +138,7 @@ fatal_sys_exit(void)
   thread_exit();
 }
 
+/* Opens a new thread based on an executable file */
 static int
 sys_exec(struct intr_frame *f)
 {
@@ -145,6 +151,7 @@ sys_exec(struct intr_frame *f)
   return process_execute(cmd_line);
 }
 
+/* Waits on a child process */
 static int
 sys_wait(struct intr_frame *f)
 {
@@ -155,6 +162,7 @@ sys_wait(struct intr_frame *f)
   return process_wait(pid);
 }
 
+/* Creates a new file */
 static int
 sys_create(struct intr_frame *f)
 {
@@ -172,6 +180,7 @@ sys_create(struct intr_frame *f)
   return success;
 }
 
+/* Delete a file */
 static int
 sys_remove(struct intr_frame *f)
 {
@@ -188,6 +197,7 @@ sys_remove(struct intr_frame *f)
   return success;
 }
 
+/* Open a file */
 static int
 sys_open(struct intr_frame *f)
 {
@@ -236,6 +246,7 @@ sys_open(struct intr_frame *f)
   return fd;
 }
 
+/* Find the size of a file */
 static int
 sys_filesize(struct intr_frame *f)
 {
@@ -257,6 +268,7 @@ sys_filesize(struct intr_frame *f)
   return size;
 }
 
+/* Read a file */
 static int
 sys_read(struct intr_frame *f)
 {
@@ -298,6 +310,7 @@ sys_read(struct intr_frame *f)
   return bytes_read;
 }
 
+/* Write to a file */
 static int
 sys_write(struct intr_frame *f)
 {
@@ -335,6 +348,7 @@ sys_write(struct intr_frame *f)
   return bytes_written;
 }
 
+/* Seek a file */
 static int
 sys_seek(struct intr_frame *f)
 {
@@ -355,6 +369,7 @@ sys_seek(struct intr_frame *f)
   return 0;
 }
 
+/* Tell a file */
 static int
 sys_tell(struct intr_frame *f)
 {
@@ -376,6 +391,7 @@ sys_tell(struct intr_frame *f)
   return position;
 }
 
+/* Close a file */
 static int
 sys_close(struct intr_frame *f)
 {
@@ -399,6 +415,7 @@ sys_close(struct intr_frame *f)
 
 /* Helper functions */
 
+/* Load arguments from the stack */
 static void
 get_args(struct intr_frame *f, int *args, int num_args)
 {

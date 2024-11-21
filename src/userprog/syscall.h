@@ -12,7 +12,7 @@ struct file_descriptor {
   struct list_elem elem;      /* List element for inclusion in a list */
 };
 
-extern struct lock filesys_lock;
+extern struct lock filesys_lock; /* To ensure two threads cant call filesys */
 
 void syscall_init (void);
 
