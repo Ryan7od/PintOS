@@ -22,6 +22,7 @@
 #include "threads/palloc.h"
 #include "threads/pte.h"
 #include "threads/thread.h"
+#include "hash.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/exception.h"
@@ -117,6 +118,8 @@ main (void)
   exception_init ();
   syscall_init ();
 #endif
+  
+  hash_init (&all_map, thread_hash_func, thread_less_func, NULL);
 
   /* Start thread scheduler and enable interrupts. */
   thread_start ();
