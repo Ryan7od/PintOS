@@ -25,27 +25,28 @@ static void validate_string(const char *str);
 static struct file_descriptor *get_file_descriptor(int fd);
 
 void fatal_sys_exit (void);
+void close_all_files (void);
 
 /* System call handler functions */
-static void sys_halt(struct intr_frame *f);
-static void sys_exit(struct intr_frame *f);
-static void sys_exec(struct intr_frame *f);
-static void sys_wait(struct intr_frame *f);
-static void sys_create(struct intr_frame *f);
-static void sys_remove(struct intr_frame *f);
-static void sys_open(struct intr_frame *f);
-static void sys_filesize(struct intr_frame *f);
-static void sys_read(struct intr_frame *f);
-static void sys_write(struct intr_frame *f);
-static void sys_seek(struct intr_frame *f);
-static void sys_tell(struct intr_frame *f);
-static void sys_close(struct intr_frame *f);
+static int sys_halt(struct intr_frame *f);
+static int sys_exit(struct intr_frame *f);
+static int sys_exec(struct intr_frame *f);
+static int sys_wait(struct intr_frame *f);
+static int sys_create(struct intr_frame *f);
+static int sys_remove(struct intr_frame *f);
+static int sys_open(struct intr_frame *f);
+static int sys_filesize(struct intr_frame *f);
+static int sys_read(struct intr_frame *f);
+static int sys_write(struct intr_frame *f);
+static int sys_seek(struct intr_frame *f);
+static int sys_tell(struct intr_frame *f);
+static int sys_close(struct intr_frame *f);
 
 struct lock filesys_lock;
 
 /* Array of system call handler functions indexed by system call numbers */
 #define SYS_CALL_NUMBER 13  // Total number of syscalls handled
-typedef void (*syscall_func)(struct intr_frame *);
+typedef int (*syscall_func)(struct intr_frame *);
 static syscall_func syscall_table[SYS_CALL_NUMBER];
 
 void
@@ -87,18 +88,20 @@ syscall_handler(struct intr_frame *f)
   }
 
   /* Call the appropriate system call handler */
-  syscall_table[syscall_number](f);
+  int return_value = syscall_table[syscall_number](f);
+  f->eax = return_value;
 }
 
 /* System call handler implementations */
 
-static void
+static int
 sys_halt(struct intr_frame *f UNUSED)
 {
   shutdown_power_off();
+  return 0;
 }
 
-static void
+static int
 sys_exit (struct intr_frame *f)
 {
   int args[1];
@@ -112,6 +115,7 @@ sys_exit (struct intr_frame *f)
 
   printf("%s: exit(%d)\n", cur->name, status);
   thread_exit();
+  return 0;
 }
 
 /* Function to be called for immediate exit fail */
@@ -129,7 +133,7 @@ fatal_sys_exit(void)
   thread_exit();
 }
 
-static void
+static int
 sys_exec(struct intr_frame *f)
 {
   int args[1];
@@ -138,20 +142,20 @@ sys_exec(struct intr_frame *f)
 
   validate_string(cmd_line);
 
-  f->eax = process_execute(cmd_line);
+  return process_execute(cmd_line);
 }
 
-static void
+static int
 sys_wait(struct intr_frame *f)
 {
   int args[1];
   get_args(f, args, 1);
   pid_t pid = args[0];
 
-  f->eax = process_wait(pid);
+  return process_wait(pid);
 }
 
-static void
+static int
 sys_create(struct intr_frame *f)
 {
   int args[2];
@@ -165,10 +169,10 @@ sys_create(struct intr_frame *f)
   bool success = filesys_create(file, initial_size);
   lock_release(&filesys_lock);
 
-  f->eax = success;
+  return success;
 }
 
-static void
+static int
 sys_remove(struct intr_frame *f)
 {
   int args[1];
@@ -181,10 +185,10 @@ sys_remove(struct intr_frame *f)
   bool success = filesys_remove(file);
   lock_release(&filesys_lock);
 
-  f->eax = success;
+  return success;
 }
 
-static void
+static int
 sys_open(struct intr_frame *f)
 {
   int args[1];
@@ -203,8 +207,7 @@ sys_open(struct intr_frame *f)
   if (list_size(&cur->fd_list) >= MAX_OPEN_FILES)
   {
     lock_release(&filesys_lock);
-    f->eax = -1;
-    return;
+    return -1;
   }
 
   file_obj = filesys_open(file);
@@ -212,8 +215,7 @@ sys_open(struct intr_frame *f)
   if (file_obj == NULL)
   {
     lock_release(&filesys_lock);
-    f->eax = -1;
-    return;
+    return -1;
   }
 
   fd_elem = malloc(sizeof(struct file_descriptor));
@@ -221,8 +223,7 @@ sys_open(struct intr_frame *f)
   {
     file_close(file_obj);
     lock_release(&filesys_lock);
-    f->eax = -1;
-    return;
+    return -1;
   }
 
   fd_elem->fd = cur->next_fd++;
@@ -232,10 +233,10 @@ sys_open(struct intr_frame *f)
   fd = fd_elem->fd;
   lock_release(&filesys_lock);
 
-  f->eax = fd;
+  return fd;
 }
 
-static void
+static int
 sys_filesize(struct intr_frame *f)
 {
   int args[1];
@@ -253,10 +254,10 @@ sys_filesize(struct intr_frame *f)
   }
   lock_release(&filesys_lock);
 
-  f->eax = size;
+  return size;
 }
 
-static void
+static int
 sys_read(struct intr_frame *f)
 {
   int args[3];
@@ -290,14 +291,14 @@ sys_read(struct intr_frame *f)
     if (fd_elem != NULL && fd_elem->file != NULL)
     {
       bytes_read = file_read(fd_elem->file, buffer, size);
-    }
+    } 
     lock_release(&filesys_lock);
   }
 
-  f->eax = bytes_read;
+  return bytes_read;
 }
 
-static void
+static int
 sys_write(struct intr_frame *f)
 {
   int args[3];
@@ -331,10 +332,10 @@ sys_write(struct intr_frame *f)
     lock_release(&filesys_lock);
   }
 
-  f->eax = bytes_written;
+  return bytes_written;
 }
 
-static void
+static int
 sys_seek(struct intr_frame *f)
 {
   int args[2];
@@ -350,9 +351,11 @@ sys_seek(struct intr_frame *f)
     file_seek(fd_elem->file, position);
   }
   lock_release(&filesys_lock);
+
+  return 0;
 }
 
-static void
+static int
 sys_tell(struct intr_frame *f)
 {
   int args[1];
@@ -370,10 +373,10 @@ sys_tell(struct intr_frame *f)
   }
   lock_release(&filesys_lock);
 
-  f->eax = position;
+  return position;
 }
 
-static void
+static int
 sys_close(struct intr_frame *f)
 {
   int args[1];
@@ -390,6 +393,8 @@ sys_close(struct intr_frame *f)
     free(fd_elem);
   }
   lock_release(&filesys_lock);
+
+  return 0;
 }
 
 /* Helper functions */
