@@ -55,6 +55,7 @@ process_execute (const char *file_name) {
   char *fn_copy2;
   fn_copy2 = palloc_get_page (0);
   if (fn_copy2 == NULL) {
+    palloc_free_page(fn_copy);
     return TID_ERROR;
   }
   strlcpy (fn_copy2, file_name, PGSIZE);
