@@ -17,6 +17,7 @@ struct child_process {
   struct list_elem elem;          // List element to add to parent's child list
   int exit_status;                // Exit status of the child
   struct semaphore sema;          // Semaphore to block parent
+  bool dead;                      // Track if the process should be freed
 };
 
 extern struct lock exit_lock;     // To ensure two threads can't race to exit

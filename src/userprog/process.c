@@ -93,6 +93,7 @@ process_execute (const char *file_name)
   child_process->parent = thread_current();
   sema_init (&child_process->sema, 0);
   child_process->exit_status = 0;
+  child_process->dead = false;
 
   struct thread *child_thread = thread_get_by_tid(tid);
   if (child_thread != NULL) {
@@ -287,13 +288,11 @@ process_wait (tid_t child_tid UNUSED)
   
   sema_down(&child_process->sema);
   
-  int exit_status = child_process->exit_status;
   // Sema upped
   //Remove child from child_list
   list_remove(&child_process->elem);
-  free(child_process);
   
-  return exit_status;
+  return child_process->exit_status;
 }
 
 /* Free the current process's resources. */
@@ -314,6 +313,9 @@ process_exit (void)
     struct child_process *cp = list_entry(e, struct child_process, elem);
     e = list_next(e);
     cp->parent = NULL;
+    if (cp->dead) {
+        free (cp);
+    }
   }
   
   lock_release(&cur->child_list_lock);
@@ -322,6 +324,7 @@ process_exit (void)
   struct child_process *child_process = cur->child_process;
   if (child_process != NULL && child_process->parent != NULL) {
     child_process->exit_status = cur->exit_status;
+    child_process->dead = true;
     sema_up(&child_process->sema);
   } else {
     free(child_process);
