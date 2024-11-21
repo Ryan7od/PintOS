@@ -125,8 +125,8 @@ start_process (void *file_name_)
   stack_size += sizeof (int);           // argc
   stack_size += sizeof (void *);        // return address
 
-  int maxArgs = (PGSIZE - stack_size) / (2 + sizeof (char *));
-  char *argv[maxArgs];
+  int max_args = (PGSIZE - stack_size) / (2 + sizeof (char *));
+  char *argv[max_args];
   int argc = 0;
   
   /* Use strtok_r to go through file_name */
@@ -230,7 +230,7 @@ setup_stack_with_args (void **esp, char **argv, int argc) {
   *esp -= sizeof (char *);
   *(char **)*esp = NULL;
   
-  /* Push argument adresses */
+  /* Push argument addresses */
   for (int i = argc - 1; i >= 0; i--) {
     *esp -= sizeof (char *);
     memcpy (*esp, &arg_addresses[ i ], sizeof (char *));
