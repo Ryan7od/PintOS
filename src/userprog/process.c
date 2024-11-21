@@ -79,26 +79,38 @@ process_execute (const char *file_name) {
   }
   file_close (file);
   
+  /* Set up the child process */
+  struct child_process *child_process = malloc (sizeof (struct child_process));
+  if (child_process == NULL) {
+    palloc_free_page (fn_copy);
+    palloc_free_page(fn_copy2);
+    return tid;
+  }
+  
+  child_process->parent = thread_current ();
+  sema_init (&child_process->sema, 0);
+  child_process->exit_status = 0;
+  child_process->dead = false;
+  
+  /* Add the child_process to the parent's list */
+  lock_acquire (&thread_current ()->child_list_lock);
+  list_push_back (&thread_current ()->child_list, &child_process->elem);
+  lock_release (&thread_current ()->child_list_lock);
+  
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
+  child_process->tid = tid;
 
   palloc_free_page(fn_copy2);
 
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
+    free (child_process);
+    lock_acquire (&thread_current ()->child_list_lock);
+    list_remove(&child_process->elem);
+    lock_release (&thread_current ()->child_list_lock);
     return tid;
   }
-  
-  /* Set up the child process */
-  struct child_process *child_process = malloc (sizeof (struct child_process));
-  if (child_process == NULL) {
-    return tid;
-  }
-  child_process->tid = tid;
-  child_process->parent = thread_current ();
-  sema_init (&child_process->sema, 0);
-  child_process->exit_status = 0;
-  child_process->dead = false;
   
   /* Assign the child_process to the relative thread */
   struct thread *child_thread = thread_get_by_tid (tid);
@@ -107,11 +119,6 @@ process_execute (const char *file_name) {
   } else {
     return tid;
   }
-  
-  /* Add the child_process to the parent's list */
-  lock_acquire (&thread_current ()->child_list_lock);
-  list_push_back (&thread_current ()->child_list, &child_process->elem);
-  lock_release (&thread_current ()->child_list_lock);
   
   return tid;
 }

@@ -79,16 +79,12 @@ static struct thread *next_thread_to_run (void);
 static void init_thread (struct thread *, const char *name, int priority);
 
 static bool is_thread (struct thread *) UNUSED;
-                                        static void *alloc_frame (
-                                                struct thread *, size_t size
-                                        );
-                                        static void schedule (void);
-                                        void thread_schedule_tail (
-                                                struct thread *prev
-                                        );
-                                        static tid_t allocate_tid (void);
+static void *alloc_frame (struct thread *, size_t size);
+static void schedule (void);
+void thread_schedule_tail (struct thread *prev);
+static tid_t allocate_tid (void);
         
-        unsigned thread_hash_func (const struct hash_elem *e, void *aux) {
+unsigned thread_hash_func (const struct hash_elem *e, void *aux) {
   const struct thread *t = hash_entry(e, struct thread, hash_elem);
   return hash_int (t->tid);
 }
