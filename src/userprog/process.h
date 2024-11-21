@@ -19,6 +19,8 @@ struct child_process {
   struct semaphore sema;          // Semaphore to block parent
 };
 
+extern struct lock exit_lock;     // To ensure two threads can't race to exit
+
 /* Process ID type */
 typedef int pid_t;
 

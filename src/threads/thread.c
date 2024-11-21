@@ -246,6 +246,10 @@ thread_init (void)
   ready_list_init();
   list_init (&all_list);
 
+#ifdef USERPROG
+  lock_init (&exit_lock);
+#endif
+
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);

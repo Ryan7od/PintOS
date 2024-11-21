@@ -27,6 +27,8 @@
 
 static thread_func start_process NO_RETURN;
 
+struct lock exit_lock;
+
 static bool
 setup_stack_with_args (void **esp, char *argv[], int argc);
 
@@ -298,6 +300,8 @@ process_wait (tid_t child_tid UNUSED)
 void
 process_exit (void)
 {
+  lock_acquire (&exit_lock);
+
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
@@ -359,6 +363,8 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
+  lock_release (&exit_lock);
 }
 
 /* Sets up the CPU for running user code in the current
