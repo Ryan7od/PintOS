@@ -59,15 +59,14 @@ process_execute (const char *file_name)
   struct file *file = NULL;
   lock_acquire(&filesys_lock);
   file = filesys_open (fn_copy2);
+  lock_release(&filesys_lock);
   if (file == NULL) {
     printf ("load: %s: open failed\n", fn_copy2);
-    lock_release(&filesys_lock);
     palloc_free_page (fn_copy);
     palloc_free_page (fn_copy2);
     return TID_ERROR;
   }
   file_close(file);
-  lock_release(&filesys_lock);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
