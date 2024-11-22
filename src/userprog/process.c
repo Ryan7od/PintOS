@@ -92,6 +92,7 @@ process_execute (const char *file_name) {
   sema_init (&child_process->load_sema, 0);
   child_process->exit_status = 0;
   child_process->dead = false;
+  child_process->fail_load = false;
   child_process->file_name = fn_copy;
   
   /* Add the child_process to the parent's list */
@@ -115,6 +116,15 @@ process_execute (const char *file_name) {
   }
   
   sema_down (&child_process->load_sema);
+  
+  if (child_process->fail_load) {
+    palloc_free_page (fn_copy);
+    free (child_process);
+    lock_acquire (&thread_current ()->child_list_lock);
+    list_remove(&child_process->elem);
+    lock_release (&thread_current ()->child_list_lock);
+    return TID_ERROR;
+  }
   
   return tid;
 }
@@ -169,6 +179,9 @@ start_process (void *child_process_) {
       for (int i = 0; i < argc; i++) {
         free (argv [ i ]);
       }
+      child_process->fail_load = true;
+      sema_up (&child_process->load_sema);
+      thread_current ()->exit_status = -1;
       thread_exit ();
     }
     strlcpy (argv[ argc++ ], token, strlen (token) + 1);
@@ -185,6 +198,7 @@ start_process (void *child_process_) {
     for (int i = 0; i < argc; i++) {
       free (argv[ i ]);
     }
+    child_process->fail_load = true;
     sema_up (&child_process->load_sema);
     thread_current ()->exit_status = -1;
     thread_exit ();
@@ -199,6 +213,7 @@ start_process (void *child_process_) {
     for (int i = 0; i < argc; i++) {
       free (argv[ i ]);
     }
+    child_process->fail_load = true;
     sema_up (&child_process->load_sema);
     thread_current ()->exit_status = -1;
     thread_exit ();
