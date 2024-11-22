@@ -483,7 +483,6 @@ load (const char *file_name, void (**eip) (void), void **esp) {
   struct file *file = NULL;
   off_t file_ofs;
   bool success = false;
-  bool file_success = true;
   int i;
   
   /* Allocate and activate page directory. */
@@ -497,7 +496,6 @@ load (const char *file_name, void (**eip) (void), void **esp) {
   lock_acquire (&filesys_lock);  // Acquire before opening
   file = filesys_open (file_name);
   if (file == NULL) {
-    file_success = false;
     lock_release (&filesys_lock);  // Release before returning
     printf ("load: %s: open failed\n", file_name);
     goto done;
@@ -604,14 +602,12 @@ load (const char *file_name, void (**eip) (void), void **esp) {
   
   done:
   /* We arrive here whether the load is successful or not. */
-  if (!success) {
+  if (!success && file != NULL) {
     /* If loading failed, close the file. */
-    if (file != NULL && file_success) {
       lock_acquire (&filesys_lock);
       file_allow_write (file);
       file_close (file);
       lock_release (&filesys_lock);
-    }
   }
   /* Do not close the file if loading succeeded. */
   return success;
