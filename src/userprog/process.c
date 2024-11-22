@@ -104,7 +104,7 @@ process_execute (const char *file_name) {
   tid = thread_create (token, PRI_DEFAULT, start_process, child_process);
   child_process->tid = tid;
 
-  palloc_free_page(fn_copy2);
+  palloc_free_page (fn_copy2);
 
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
@@ -118,7 +118,6 @@ process_execute (const char *file_name) {
   sema_down (&child_process->load_sema);
   
   if (child_process->fail_load) {
-    palloc_free_page (fn_copy);
     lock_acquire (&thread_current ()->child_list_lock);
     list_remove(&child_process->elem);
     lock_release (&thread_current ()->child_list_lock);
