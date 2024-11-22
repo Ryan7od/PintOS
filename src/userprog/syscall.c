@@ -18,36 +18,77 @@ static void syscall_handler (struct intr_frame *);
 static int get_user (const uint8_t *uaddr);
 
 static bool put_user (uint8_t *udst, uint8_t byte) UNUSED;
-static void get_args (struct intr_frame *f, int *args, int num_args);
-static void validate_buffer (const void *buffer, unsigned size);
-static void validate_user_pointer (const void *ptr);
-static void validate_string (const char *str);
-static struct file_descriptor *get_file_descriptor (int fd);
+                                                   static void get_args (
+                                                           struct intr_frame *f,
+                                                           int *args,
+                                                           int num_args
+                                                   );
+                                                   static void validate_buffer (
+                                                           const void *buffer,
+                                                           unsigned size
+                                                   );
+                                                   static void validate_user_pointer (
+                                                           const void *ptr
+                                                   );
+                                                   static void validate_string (
+                                                           const char *str
+                                                   );
+                                                   static struct file_descriptor *get_file_descriptor (
+                                                           int fd
+                                                   );
 
 /* System call handler functions */
-static int sys_halt (struct intr_frame *f);
-static int sys_exit (struct intr_frame *f);
-static int sys_exec (struct intr_frame *f);
-static int sys_wait (struct intr_frame *f);
-static int sys_create (struct intr_frame *f);
-static int sys_remove (struct intr_frame *f);
-static int sys_open (struct intr_frame *f);
-static int sys_filesize (struct intr_frame *f);
-static int sys_read (struct intr_frame *f);
-static int sys_write (struct intr_frame *f);
-static int sys_seek (struct intr_frame *f);
-static int sys_tell (struct intr_frame *f);
-static int sys_close (struct intr_frame *f);
-
-struct lock filesys_lock;
+                                                   static int sys_halt (
+                                                           struct intr_frame *f
+                                                   );
+                                                   static int sys_exit (
+                                                           struct intr_frame *f
+                                                   );
+                                                   static int sys_exec (
+                                                           struct intr_frame *f
+                                                   );
+                                                   static int sys_wait (
+                                                           struct intr_frame *f
+                                                   );
+                                                   static int sys_create (
+                                                           struct intr_frame *f
+                                                   );
+                                                   static int sys_remove (
+                                                           struct intr_frame *f
+                                                   );
+                                                   static int sys_open (
+                                                           struct intr_frame *f
+                                                   );
+                                                   static int sys_filesize (
+                                                           struct intr_frame *f
+                                                   );
+                                                   static int sys_read (
+                                                           struct intr_frame *f
+                                                   );
+                                                   static int sys_write (
+                                                           struct intr_frame *f
+                                                   );
+                                                   static int sys_seek (
+                                                           struct intr_frame *f
+                                                   );
+                                                   static int sys_tell (
+                                                           struct intr_frame *f
+                                                   );
+                                                   static int sys_close (
+                                                           struct intr_frame *f
+                                                   );
+                                                   
+                                                   struct lock filesys_lock;
 
 /* Array of system call handler functions indexed by system call numbers */
 #define SYS_CALL_NUMBER 13  // Total number of syscalls handled
-typedef int (*syscall_func) (struct intr_frame *);
-static syscall_func syscall_table[SYS_CALL_NUMBER];
+                                                   typedef int (*syscall_func) (
+                                                           struct intr_frame *
+                                                   );
+                                                   static syscall_func syscall_table[SYS_CALL_NUMBER];
         
-void
-syscall_init (void)
+        void
+        syscall_init (void)
 {
   lock_init (&filesys_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");

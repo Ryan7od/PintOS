@@ -55,7 +55,7 @@ process_execute (const char *file_name) {
   char *fn_copy2;
   fn_copy2 = palloc_get_page (0);
   if (fn_copy2 == NULL) {
-    palloc_free_page(fn_copy);
+    palloc_free_page (fn_copy);
     return TID_ERROR;
   }
   strlcpy (fn_copy2, file_name, PGSIZE);
@@ -83,7 +83,7 @@ process_execute (const char *file_name) {
   struct child_process *child_process = malloc (sizeof (struct child_process));
   if (child_process == NULL) {
     palloc_free_page (fn_copy);
-    palloc_free_page(fn_copy2);
+    palloc_free_page (fn_copy2);
     return TID_ERROR;
   }
   
@@ -103,13 +103,13 @@ process_execute (const char *file_name) {
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (token, PRI_DEFAULT, start_process, child_process);
   child_process->tid = tid;
-
+  
   palloc_free_page (fn_copy2);
-
+  
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     lock_acquire (&thread_current ()->child_list_lock);
-    list_remove(&child_process->elem);
+    list_remove (&child_process->elem);
     lock_release (&thread_current ()->child_list_lock);
     free (child_process);
     return tid;
@@ -119,7 +119,7 @@ process_execute (const char *file_name) {
   
   if (child_process->fail_load) {
     lock_acquire (&thread_current ()->child_list_lock);
-    list_remove(&child_process->elem);
+    list_remove (&child_process->elem);
     lock_release (&thread_current ()->child_list_lock);
     free (child_process);
     return TID_ERROR;
@@ -134,7 +134,7 @@ static void
 start_process (void *child_process_) {
   struct child_process *child_process = child_process_;
   char *file_name = child_process->file_name;
-  thread_current()->child_process = child_process;
+  thread_current ()->child_process = child_process;
   struct intr_frame if_;
   bool success;
   
@@ -176,7 +176,7 @@ start_process (void *child_process_) {
     argv[ argc ] = malloc (strlen (token) + 1);
     if (argv[ argc ] == NULL) {
       for (int i = 0; i < argc; i++) {
-        free (argv [ i ]);
+        free (argv[ i ]);
       }
       child_process->fail_load = true;
       sema_up (&child_process->load_sema);
@@ -612,11 +612,11 @@ load (const char *file_name, void (**eip) (void), void **esp) {
   /* We arrive here whether the load is successful or not. */
   if (!success && file != NULL) {
     /* If loading failed, close the file. */
-      lock_acquire (&filesys_lock);
-      file_allow_write (file);
-      file_close (file);
-      t->executable = NULL;
-      lock_release (&filesys_lock);
+    lock_acquire (&filesys_lock);
+    file_allow_write (file);
+    file_close (file);
+    t->executable = NULL;
+    lock_release (&filesys_lock);
   }
   /* Do not close the file if loading succeeded. */
   return success;
