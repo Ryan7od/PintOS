@@ -113,7 +113,6 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    struct hash_elem hash_elem;          /* Hash map element for thread_map */
 
     struct list held_locks;             /* List of locks held by this thread */
     struct lock *waiting_on;            /* Current lock this thread is 
@@ -140,10 +139,6 @@ struct thread
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "mlfqs". */
 extern bool thread_mlfqs;
-
-extern struct hash all_map;
-unsigned thread_hash_func(const struct hash_elem *e, void *aux);
-bool thread_less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux);
 
 void thread_init (void);
 

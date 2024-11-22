@@ -89,8 +89,10 @@ process_execute (const char *file_name) {
   
   child_process->parent = thread_current ();
   sema_init (&child_process->sema, 0);
+  sema_init (&child_process->load_sema, 0);
   child_process->exit_status = 0;
   child_process->dead = false;
+  child_process->file_name = fn_copy;
   
   /* Add the child_process to the parent's list */
   lock_acquire (&thread_current ()->child_list_lock);
@@ -98,7 +100,7 @@ process_execute (const char *file_name) {
   lock_release (&thread_current ()->child_list_lock);
   
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (token, PRI_DEFAULT, start_process, child_process);
   child_process->tid = tid;
 
   palloc_free_page(fn_copy2);
@@ -112,20 +114,16 @@ process_execute (const char *file_name) {
     return tid;
   }
   
-  /* Assign the child_process to the relative thread */
-  struct thread *child_thread = thread_get_by_tid (tid);
-  if (child_thread != NULL) {
-    child_thread->child_process = child_process;
-  }
-  
   return tid;
 }
 
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_) {
-  char *file_name = file_name_;
+start_process (void *child_process_) {
+  struct child_process *child_process = child_process_;
+  char *file_name = child_process->file_name;
+  thread_current()->child_process = child_process;
   struct intr_frame if_;
   bool success;
   
