@@ -130,8 +130,6 @@ struct thread
     struct lock child_list_lock;         /* Lock to protect access to child_list */
     struct child_process *child_process; /* Relevant child_process */
     struct file *executable;             /* Executable file. */
-    int child_mallocs;
-    int fd_mallocs;
 #endif
 
     /* Owned by thread.c. */
