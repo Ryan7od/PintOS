@@ -30,7 +30,7 @@ NO_RETURN;
 
 struct lock exit_lock;
 
-static bool
+static void
 setup_stack_with_args (void **esp, char *argv[], int argc);
 
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -202,18 +202,7 @@ start_process (void *file_name_) {
     thread_exit ();
   }
   
-  /* Set up the stack using argv and argc and quit if failed */
-  if (!setup_stack_with_args (&if_.esp, argv, argc)) {
-    for (int i = 0; i < argc; i++) {
-      free (argv[ i ]);
-    }
-    thread_current ()->exit_status = -1;
-    thread_exit ();
-  }
-  
-  for (int i = 0; i < argc; i++) {
-    free (argv[ i ]);
-  }
+  setup_stack_with_args (&if_.esp, argv, argc);
   
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -229,7 +218,7 @@ start_process (void *file_name_) {
  * to the stack and sets up the stack, with argv inserted in reverse order,
  * followed by word aligning it, then a null sentinel, then a pointer to argv,
  * then argc, then a fake return address of 0 */
-static bool
+static void
 setup_stack_with_args (void **esp, char **argv, int argc) {
   void *null_ptr = NULL;
   
