@@ -538,6 +538,8 @@ thread_exit (void) {
   struct thread *cur = thread_current ();
   struct list_elem *e = list_begin(&cur->fd_list);
 
+  lock_acquire(&filesys_lock);
+
   while (e != list_end(&cur->fd_list)) {
     struct file_descriptor *fd = list_entry(e, struct file_descriptor, elem);
     e = list_next(e);
@@ -545,6 +547,8 @@ thread_exit (void) {
     file_close(fd->file);
     free(fd);
   }
+
+  lock_release(&filesys_lock);
   
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
