@@ -118,8 +118,6 @@ main (void)
   exception_init ();
   syscall_init ();
 #endif
-  
-  hash_init (&all_map, thread_hash_func, thread_less_func, NULL);
 
   /* Start thread scheduler and enable interrupts. */
   thread_start ();

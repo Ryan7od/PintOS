@@ -30,7 +30,7 @@ NO_RETURN;
 
 struct lock exit_lock;
 
-static bool
+static void
 setup_stack_with_args (void **esp, char *argv[], int argc);
 
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -55,6 +55,7 @@ process_execute (const char *file_name) {
   char *fn_copy2;
   fn_copy2 = palloc_get_page (0);
   if (fn_copy2 == NULL) {
+    palloc_free_page(fn_copy);
     return TID_ERROR;
   }
   strlcpy (fn_copy2, file_name, PGSIZE);
@@ -78,40 +79,51 @@ process_execute (const char *file_name) {
   }
   file_close (file);
   
-  /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR) {
-    palloc_free_page (fn_copy);
-    palloc_free_page (fn_copy2);
-    return tid;
-  }
-  
   /* Set up the child process */
   struct child_process *child_process = malloc (sizeof (struct child_process));
   if (child_process == NULL) {
     palloc_free_page (fn_copy);
-    return tid;
+    palloc_free_page(fn_copy2);
+    return TID_ERROR;
   }
-  child_process->tid = tid;
+  
   child_process->parent = thread_current ();
   sema_init (&child_process->sema, 0);
+  sema_init (&child_process->load_sema, 0);
   child_process->exit_status = 0;
   child_process->dead = false;
-  
-  /* Assign the child_process to the relative thread */
-  struct thread *child_thread = thread_get_by_tid (tid);
-  if (child_thread != NULL) {
-    child_thread->child_process = child_process;
-  } else {
-    palloc_free_page (fn_copy);
-    palloc_free_page (fn_copy2);
-    return tid;
-  }
+  child_process->fail_load = false;
+  child_process->file_name = fn_copy;
   
   /* Add the child_process to the parent's list */
   lock_acquire (&thread_current ()->child_list_lock);
   list_push_back (&thread_current ()->child_list, &child_process->elem);
   lock_release (&thread_current ()->child_list_lock);
+  
+  /* Create a new thread to execute FILE_NAME. */
+  tid = thread_create (token, PRI_DEFAULT, start_process, child_process);
+  child_process->tid = tid;
+
+  palloc_free_page (fn_copy2);
+
+  if (tid == TID_ERROR) {
+    palloc_free_page (fn_copy);
+    lock_acquire (&thread_current ()->child_list_lock);
+    list_remove(&child_process->elem);
+    lock_release (&thread_current ()->child_list_lock);
+    free (child_process);
+    return tid;
+  }
+  
+  sema_down (&child_process->load_sema);
+  
+  if (child_process->fail_load) {
+    lock_acquire (&thread_current ()->child_list_lock);
+    list_remove(&child_process->elem);
+    lock_release (&thread_current ()->child_list_lock);
+    free (child_process);
+    return TID_ERROR;
+  }
   
   return tid;
 }
@@ -119,8 +131,10 @@ process_execute (const char *file_name) {
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_) {
-  char *file_name = file_name_;
+start_process (void *child_process_) {
+  struct child_process *child_process = child_process_;
+  char *file_name = child_process->file_name;
+  thread_current()->child_process = child_process;
   struct intr_frame if_;
   bool success;
   
@@ -161,6 +175,12 @@ start_process (void *file_name_) {
     
     argv[ argc ] = malloc (strlen (token) + 1);
     if (argv[ argc ] == NULL) {
+      for (int i = 0; i < argc; i++) {
+        free (argv [ i ]);
+      }
+      child_process->fail_load = true;
+      sema_up (&child_process->load_sema);
+      thread_current ()->exit_status = -1;
       thread_exit ();
     }
     strlcpy (argv[ argc++ ], token, strlen (token) + 1);
@@ -177,6 +197,8 @@ start_process (void *file_name_) {
     for (int i = 0; i < argc; i++) {
       free (argv[ i ]);
     }
+    child_process->fail_load = true;
+    sema_up (&child_process->load_sema);
     thread_current ()->exit_status = -1;
     thread_exit ();
   } else {
@@ -190,22 +212,15 @@ start_process (void *file_name_) {
     for (int i = 0; i < argc; i++) {
       free (argv[ i ]);
     }
+    child_process->fail_load = true;
+    sema_up (&child_process->load_sema);
     thread_current ()->exit_status = -1;
     thread_exit ();
   }
   
-  /* Set up the stack using argv and argc and quit if failed */
-  if (!setup_stack_with_args (&if_.esp, argv, argc)) {
-    for (int i = 0; i < argc; i++) {
-      free (argv[ i ]);
-    }
-    thread_current ()->exit_status = -1;
-    thread_exit ();
-  }
+  setup_stack_with_args (&if_.esp, argv, argc);
   
-  for (int i = 0; i < argc; i++) {
-    free (argv[ i ]);
-  }
+  sema_up (&child_process->load_sema);
   
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -221,7 +236,7 @@ start_process (void *file_name_) {
  * to the stack and sets up the stack, with argv inserted in reverse order,
  * followed by word aligning it, then a null sentinel, then a pointer to argv,
  * then argc, then a fake return address of 0 */
-static bool
+static void
 setup_stack_with_args (void **esp, char **argv, int argc) {
   void *null_ptr = NULL;
   
@@ -292,12 +307,16 @@ process_wait (tid_t child_tid UNUSED) {
     return -1;
   }
   
-  sema_down (&child_process->sema);
+  if (!child_process->dead) {
+    sema_down (&child_process->sema);
+  }
   
   //Remove child from child_list
   list_remove (&child_process->elem);
+  int exit_status = child_process->exit_status;
+  free (child_process);
   
-  return child_process->exit_status;
+  return exit_status;
 }
 
 /* Free the current process's resources. */
@@ -337,14 +356,15 @@ process_exit (void) {
     free (child_process);
   }
   
+  lock_acquire (&filesys_lock);
   /* Handle executable file */
   if (cur->executable != NULL) {
+    file_allow_write (cur->executable);
     file_close (cur->executable);
     cur->executable = NULL;
   }
   
   /* Handle all of the fd's */
-  lock_acquire (&filesys_lock);
   while (!list_empty (&cur->fd_list)) {
     struct list_elem *e = list_pop_front (&cur->fd_list);
     struct file_descriptor *fd_elem = list_entry (e,
@@ -590,13 +610,13 @@ load (const char *file_name, void (**eip) (void), void **esp) {
   
   done:
   /* We arrive here whether the load is successful or not. */
-  if (!success) {
+  if (!success && file != NULL) {
     /* If loading failed, close the file. */
-    if (file != NULL) {
       lock_acquire (&filesys_lock);
+      file_allow_write (file);
       file_close (file);
+      t->executable = NULL;
       lock_release (&filesys_lock);
-    }
   }
   /* Do not close the file if loading succeeded. */
   return success;

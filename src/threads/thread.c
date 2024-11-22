@@ -14,6 +14,7 @@
 #include "threads/fixed-point.h"
 #include "hash.h"
 #include "devices/timer.h"
+#include "userprog/syscall.h"
 
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -31,9 +32,6 @@ struct list ready_list[PRI_MAX - PRI_MIN + 1];
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
-
-/* Map from tid to thread */
-struct hash all_map;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -78,38 +76,10 @@ static struct thread *next_thread_to_run (void);
 static void init_thread (struct thread *, const char *name, int priority);
 
 static bool is_thread (struct thread *) UNUSED;
-                                        static void *alloc_frame (
-                                                struct thread *, size_t size
-                                        );
-                                        static void schedule (void);
-                                        void thread_schedule_tail (
-                                                struct thread *prev
-                                        );
-                                        static tid_t allocate_tid (void);
-        
-        unsigned thread_hash_func (const struct hash_elem *e, void *aux) {
-  const struct thread *t = hash_entry(e, struct thread, hash_elem);
-  return hash_int (t->tid);
-}
-
-bool thread_less_func (
-        const struct hash_elem *a, const struct hash_elem *b, void *aux
-) {
-  const struct thread *t_a = hash_entry(a, struct thread, hash_elem);
-  const struct thread *t_b = hash_entry(b, struct thread, hash_elem);
-  return t_a->tid < t_b->tid;
-}
-
-struct thread *thread_get_by_tid (tid_t tid) {
-  struct thread t;
-  struct hash_elem *e;
-  t.tid = tid;
-  e = hash_find (&all_map, &t.hash_elem);
-  if (e == NULL) {
-    return NULL;
-  }
-  return hash_entry(e, struct thread, hash_elem);
-}
+static void *alloc_frame (struct thread *, size_t size);
+static void schedule (void);
+void thread_schedule_tail (struct thread *prev);
+static tid_t allocate_tid (void);
 
 /* Returns true if ELEM is an interior element,
    false otherwise. */
@@ -450,8 +420,6 @@ thread_create (
   
   intr_set_level (old_level);
   
-  hash_insert (&all_map, &t->hash_elem);
-  
   /* Add to run queue. */
   thread_unblock (t);
   
@@ -544,7 +512,6 @@ thread_exit (void) {
      when it calls thread_schedule_tail(). */
   intr_disable ();
   list_remove (&thread_current ()->allelem);
-  hash_delete (&all_map, &thread_current ()->hash_elem);
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
@@ -721,8 +688,6 @@ init_thread (struct thread *t, const char *name, int priority) {
   t->priority = priority;
   t->effective_priority = priority;
   t->magic = THREAD_MAGIC;
-  list_init (&t->fd_list);
-  t->next_fd = 2;
   
   if (thread_mlfqs) {
     if (strcmp (name, "main") == 0) {
@@ -741,11 +706,16 @@ init_thread (struct thread *t, const char *name, int priority) {
   // Initialise variables for priority donation
   list_init (&t->held_locks);
   t->waiting_on = NULL;
-  
+
+#ifdef USERPROG
   // Initialise variables for child processes
   list_init (&t->child_list);
   lock_init (&t->child_list_lock);
   t->child_process = NULL;
+  
+  list_init (&t->fd_list);
+  t->next_fd = 2;
+#endif
   
   intr_set_level (old_level);
 }

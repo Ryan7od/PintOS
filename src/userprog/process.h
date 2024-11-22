@@ -17,7 +17,10 @@ struct child_process {
   struct list_elem elem;          /* List element to add to parent's child list */
   int exit_status;                /* Exit status of the child */
   struct semaphore sema;          /* Semaphore to block parent */
+  struct semaphore load_sema;     /* Semaphore to block parent while loading */
   bool dead;                      /* Track if the process should be freed */
+  char *file_name;                /* File name to pass to start process */
+  bool fail_load;
 };
 
 extern struct lock exit_lock;     /* To ensure two threads can't race to exit */

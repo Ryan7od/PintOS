@@ -127,7 +127,6 @@ struct thread
     
     struct list child_list;              /* List of child_process structures */
     struct lock child_list_lock;         /* Lock to protect access to child_list */
-    struct hash_elem hash_elem;          /* Hash map element for thread_map */
     struct child_process *child_process; /* Relevant child_process */
     struct file *executable;             /* Executable file. */
 #endif
@@ -140,10 +139,6 @@ struct thread
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "mlfqs". */
 extern bool thread_mlfqs;
-
-extern struct hash all_map;
-unsigned thread_hash_func(const struct hash_elem *e, void *aux);
-bool thread_less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux);
 
 void thread_init (void);
 

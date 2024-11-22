@@ -130,6 +130,7 @@ kill (struct intr_frame *f)
       printf ("%s: dying due to interrupt %#04x (%s).\n",
               thread_name (), f->vec_no, intr_name (f->vec_no));
       intr_dump_frame (f);
+      printf("%s: exit(-1)\n", thread_current()->name);
       thread_current () -> exit_status = -1;
       thread_exit (); 
 
@@ -189,14 +190,16 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+  
+  thread_current ()->exit_status = -1;
+  close_all_files ();
 
-  /* Page fault in the kernel merely sets the interupt frame eax to 
+  /* Page fault in thekernel merely sets the interupt frame eax to 
      0xffffffff and copies the old value into eip. */
   if (!user) {
    f->eip = (void *) f->eax;
    f->eax = 0xffffffff;
-   printf("PANTIC\n");
-   PANIC("Kernel bug - unexpected page fault in kernel mode");
+   fatal_sys_exit();
   }
 
   /* To implement virtual memory, delete the rest of the function
@@ -207,8 +210,6 @@ page_fault (struct intr_frame *f)
           not_present ? "not present" : "rights violation",
           write ? "writing" : "reading",
           user ? "user" : "kernel");
-  printf("%s: exit(-1)\n", thread_current()->name);
-  thread_current()->exit_status = -1;
-  thread_exit();
+  kill(f);
 }
 
