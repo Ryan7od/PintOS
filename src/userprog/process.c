@@ -347,6 +347,7 @@ process_exit (void) {
     free (child_process);
   }
   
+  lock_acquire (&filesys_lock);
   /* Handle executable file */
   if (cur->executable != NULL) {
     file_allow_write (cur->executable);
@@ -355,7 +356,6 @@ process_exit (void) {
   }
   
   /* Handle all of the fd's */
-  lock_acquire (&filesys_lock);
   while (!list_empty (&cur->fd_list)) {
     struct list_elem *e = list_pop_front (&cur->fd_list);
     struct file_descriptor *fd_elem = list_entry (e,
