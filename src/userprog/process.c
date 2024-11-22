@@ -108,10 +108,10 @@ process_execute (const char *file_name) {
 
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
-    free (child_process);
     lock_acquire (&thread_current ()->child_list_lock);
     list_remove(&child_process->elem);
     lock_release (&thread_current ()->child_list_lock);
+    free (child_process);
     return tid;
   }
   
@@ -119,10 +119,10 @@ process_execute (const char *file_name) {
   
   if (child_process->fail_load) {
     palloc_free_page (fn_copy);
-    free (child_process);
     lock_acquire (&thread_current ()->child_list_lock);
     list_remove(&child_process->elem);
     lock_release (&thread_current ()->child_list_lock);
+    free (child_process);
     return TID_ERROR;
   }
   
