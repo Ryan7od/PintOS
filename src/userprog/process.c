@@ -116,8 +116,6 @@ process_execute (const char *file_name) {
   struct thread *child_thread = thread_get_by_tid (tid);
   if (child_thread != NULL) {
     child_thread->child_process = child_process;
-  } else {
-    return tid;
   }
   
   return tid;
