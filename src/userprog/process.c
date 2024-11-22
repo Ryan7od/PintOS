@@ -114,6 +114,8 @@ process_execute (const char *file_name) {
     return tid;
   }
   
+  sema_down (&child_process->load_sema);
+  
   return tid;
 }
 
@@ -183,6 +185,7 @@ start_process (void *child_process_) {
     for (int i = 0; i < argc; i++) {
       free (argv[ i ]);
     }
+    sema_up (&child_process->load_sema);
     thread_current ()->exit_status = -1;
     thread_exit ();
   } else {
@@ -196,11 +199,14 @@ start_process (void *child_process_) {
     for (int i = 0; i < argc; i++) {
       free (argv[ i ]);
     }
+    sema_up (&child_process->load_sema);
     thread_current ()->exit_status = -1;
     thread_exit ();
   }
   
   setup_stack_with_args (&if_.esp, argv, argc);
+  
+  sema_up (&child_process->load_sema);
   
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
