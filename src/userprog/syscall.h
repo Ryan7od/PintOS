@@ -16,4 +16,7 @@ extern struct lock filesys_lock; /* To ensure two threads cant call filesys */
 
 void syscall_init (void);
 
+void fatal_sys_exit (void);
+void close_all_files (void);
+
 #endif /* userprog/syscall.h */
