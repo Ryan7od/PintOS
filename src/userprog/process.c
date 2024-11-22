@@ -300,7 +300,9 @@ process_wait (tid_t child_tid UNUSED) {
     return -1;
   }
   
-  sema_down (&child_process->sema);
+  if (!child_process->dead) {
+    sema_down (&child_process->sema);
+  }
   
   //Remove child from child_list
   list_remove (&child_process->elem);
