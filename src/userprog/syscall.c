@@ -110,8 +110,6 @@ sys_exit (struct intr_frame *f) {
   struct thread *cur = thread_current ();
   cur->exit_status = status;
   
-  close_all_files ();
-  
   printf ("%s: exit(%d)\n", cur->name, status);
   thread_exit ();
   return 0;
@@ -122,9 +120,6 @@ void
 fatal_sys_exit (void) {
   struct thread *cur = thread_current ();
   cur->exit_status = -1;
-  
-  /* Close all open files before exiting */
-  close_all_files ();
   
   /* Print exit status */
   printf ("%s: exit(%d)\n", cur->name, -1);
