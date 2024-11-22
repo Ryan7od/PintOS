@@ -113,6 +113,7 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    struct hash_elem hash_elem;          /* Hash map element for thread_map */
 
     struct list held_locks;             /* List of locks held by this thread */
     struct lock *waiting_on;            /* Current lock this thread is 
@@ -127,9 +128,10 @@ struct thread
     
     struct list child_list;              /* List of child_process structures */
     struct lock child_list_lock;         /* Lock to protect access to child_list */
-    struct hash_elem hash_elem;          /* Hash map element for thread_map */
     struct child_process *child_process; /* Relevant child_process */
     struct file *executable;             /* Executable file. */
+    int child_mallocs;
+    int fd_mallocs;
 #endif
 
     /* Owned by thread.c. */

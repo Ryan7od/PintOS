@@ -535,20 +535,6 @@ thread_exit (void) {
 #ifdef USERPROG
   process_exit ();
 #endif
-  struct thread *cur = thread_current ();
-  struct list_elem *e = list_begin(&cur->fd_list);
-
-  lock_acquire(&filesys_lock);
-
-  while (e != list_end(&cur->fd_list)) {
-    struct file_descriptor *fd = list_entry(e, struct file_descriptor, elem);
-    e = list_next(e);
-    list_remove(&fd->elem);
-    file_close(fd->file);
-    free(fd);
-  }
-
-  lock_release(&filesys_lock);
   
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
@@ -732,8 +718,6 @@ init_thread (struct thread *t, const char *name, int priority) {
   t->priority = priority;
   t->effective_priority = priority;
   t->magic = THREAD_MAGIC;
-  list_init (&t->fd_list);
-  t->next_fd = 2;
   
   if (thread_mlfqs) {
     if (strcmp (name, "main") == 0) {
@@ -752,11 +736,16 @@ init_thread (struct thread *t, const char *name, int priority) {
   // Initialise variables for priority donation
   list_init (&t->held_locks);
   t->waiting_on = NULL;
-  
+
+#ifdef USERPROG
   // Initialise variables for child processes
   list_init (&t->child_list);
   lock_init (&t->child_list_lock);
   t->child_process = NULL;
+  
+  list_init (&t->fd_list);
+  t->next_fd = 2;
+#endif
   
   intr_set_level (old_level);
 }

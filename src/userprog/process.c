@@ -360,6 +360,7 @@ process_exit (void) {
     struct file_descriptor *fd_elem = list_entry (e,
     struct file_descriptor, elem);
     
+    list_remove (e);
     file_close (fd_elem->file);
     free (fd_elem);
   }
