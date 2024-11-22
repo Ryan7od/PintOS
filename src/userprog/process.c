@@ -84,7 +84,7 @@ process_execute (const char *file_name) {
   if (child_process == NULL) {
     palloc_free_page (fn_copy);
     palloc_free_page(fn_copy2);
-    return tid;
+    return TID_ERROR;
   }
   
   child_process->parent = thread_current ();
