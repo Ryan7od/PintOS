@@ -20,7 +20,7 @@ struct child_process {
   struct semaphore load_sema;     /* Semaphore to block parent while loading */
   bool dead;                      /* Track if the process should be freed */
   char *file_name;                /* File name to pass to start process */
-  bool fail_load;
+  bool fail_load;                 /* Boolean to propogate start process failure */
 };
 
 extern struct lock exit_lock;     /* To ensure two threads can't race to exit */
